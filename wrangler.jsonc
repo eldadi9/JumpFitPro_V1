@@ -5,7 +5,7 @@
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
   // "vars": {
   //   "MY_VAR": "my-variable"
   // },
@@ -21,13 +21,13 @@
   //     "bucket_name": "my-bucket"
   //   }
   // ],
-  // "d1_databases": [
-  //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
-  //   }
-  // ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rope-fitness-db",
+      "database_id": "local-development-db"
+    }
+  ]
   // "ai": {
   //   "binding": "AI"
   // }
