@@ -1,0 +1,20 @@
+{
+  "name": "JumpFitPro - ניהול ירידה במשקל",
+  "short_name": "JumpFitPro",
+  "description": "אפליקציה מקיפה לניהול תכנית ירידה במשקל באמצעות קפיצה בחבל",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#667eea",
+  "orientation": "portrait",
+  "dir": "rtl",
+  "lang": "he",
+  "icons": [
+    {
+      "src": "/static/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
