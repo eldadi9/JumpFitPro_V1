@@ -1024,8 +1024,8 @@ app.post('/api/auth/complete-profile', async (c) => {
     // Add initial weight record
     if (weight_kg) {
       await c.env.DB.prepare(`
-        INSERT INTO weight_tracking (user_id, weight_kg, notes)
-        VALUES (?, ?, 'משקל התחלתי')
+        INSERT INTO weight_tracking (user_id, weight_kg, measurement_date, notes)
+        VALUES (?, ?, DATE('now'), 'משקל התחלתי')
       `).bind(user_id, weight_kg).run()
     }
     
