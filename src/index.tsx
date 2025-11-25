@@ -1315,11 +1315,20 @@ app.get('/', (c) => {
         <!-- Welcome Modal (Hidden by default) -->
         <div id="welcomeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center animate-slide-in">
-                <div class="text-6xl mb-4">🎉</div>
-                <h2 class="text-3xl font-bold text-gray-800 mb-4">ברוך הבא לחבורה!</h2>
-                <p class="text-gray-600 mb-6">עכשיו אתה רשמית חלק ממשפחת JumpFitPro! בואו נתחיל את המסע שלך לירידה במשקל 💪</p>
-                <button onclick="closeWelcomeModal()" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105">
-                    בואו נתחיל! 🚀
+                <div class="text-6xl mb-4">🪢🎉</div>
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">יאללה, בואו נקפוץ! 🚀</h2>
+                <p class="text-gray-600 mb-4 text-lg">
+                    <strong>ברוכים הבאים למועדון הכי קופץ בעולם!</strong> 🌍
+                </p>
+                <p class="text-gray-500 mb-6">
+                    הצטרפת למשפחת JumpFitPro - איפה הקלוריות בורחות מפחד והקילוגרמים מתחילים לבכות! 😂<br/>
+                    <span class="text-indigo-600 font-bold">רק תזכור:</span> כל קפיצה היא צעד אחד קרוב יותר למטרה (ועוד קלוריה שלא תחזור)! 💪
+                </p>
+                <p class="text-sm text-gray-400 mb-6 italic">
+                    "החיים קצרים מדי כדי לא לקפוץ" - משפט חכמה מאת חבל קפיצה 🪢
+                </p>
+                <button onclick="closeWelcomeModal()" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 shadow-lg">
+                    בואו נתחיל לקפוץ! 🪢💥
                 </button>
             </div>
         </div>
@@ -1330,7 +1339,7 @@ app.get('/', (c) => {
                 <!-- Left Side - Branding -->
                 <div class="bg-gradient-to-br from-indigo-600 to-purple-600 p-12 text-white md:w-1/2">
                     <div class="flex flex-col items-center justify-center h-full text-center">
-                        <div class="text-6xl mb-6">🏃‍♂️</div>
+                        <div class="text-6xl mb-6">🪢</div>
                         <h1 class="text-4xl font-bold mb-4">JumpFitPro</h1>
                         <p class="text-lg mb-8">המסע שלך לירידה במשקל מתחיל כאן!</p>
                         <div class="space-y-3 text-right">
@@ -1714,11 +1723,17 @@ app.get('/admin', (c) => {
                               '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">⏸️ לא פעיל</span>'}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">\${new Date(user.created_at).toLocaleDateString('he-IL')}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <a href="/dashboard?user=\${user.id}" target="_blank" class="text-indigo-600 hover:text-indigo-900 mr-3">
-                                <i class="fas fa-eye"></i> צפה
+                        <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                            <a href="/dashboard?user=\${user.id}" target="_blank" class="inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-xs">
+                                <i class="fas fa-chart-line"></i> דשבורד
                             </a>
-                            <a href="/settings?user=\${user.id}" target="_blank" class="text-blue-600 hover:text-blue-900">
+                            <a href="/plans?user=\${user.id}" target="_blank" class="inline-block bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
+                                <i class="fas fa-dumbbell"></i> תכניות
+                            </a>
+                            <a href="/live-workout?user=\${user.id}" target="_blank" class="inline-block bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs">
+                                <i class="fas fa-play-circle"></i> אימון
+                            </a>
+                            <a href="/settings?user=\${user.id}" target="_blank" class="inline-block bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
                                 <i class="fas fa-cog"></i> הגדרות
                             </a>
                         </td>
@@ -1727,6 +1742,227 @@ app.get('/admin', (c) => {
             }
 
             function handleLogout() {
+                localStorage.clear()
+                window.location.href = '/'
+            }
+
+            // Load on page load
+            loadUsers()
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+/**
+ * Admin Panel - ניהול משתמשים (Admin בלבד)
+ */
+app.get('/admin', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="he" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Admin Panel - JumpFitPro</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen p-4">
+        <div class="max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">
+                            <i class="fas fa-user-shield text-indigo-600 ml-2"></i>
+                            Admin Panel
+                        </h1>
+                        <p class="text-gray-600 mt-2">ניהול כל המשתמשים במערכת</p>
+                    </div>
+                    <div>
+                        <span id="adminName" class="text-lg font-bold text-indigo-600"></span>
+                        <button onclick="logout()" class="mr-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-sign-out-alt ml-2"></i>
+                            התנתק
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm">סך הכל משתמשים</p>
+                            <p id="totalUsers" class="text-3xl font-bold mt-1">0</p>
+                        </div>
+                        <i class="fas fa-users text-5xl text-blue-200"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100 text-sm">משתמשים פעילים</p>
+                            <p id="activeUsers" class="text-3xl font-bold mt-1">0</p>
+                        </div>
+                        <i class="fas fa-user-check text-5xl text-green-200"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-100 text-sm">מנהלי מערכת</p>
+                            <p id="adminUsers" class="text-3xl font-bold mt-1">0</p>
+                        </div>
+                        <i class="fas fa-user-shield text-5xl text-purple-200"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-red-100 text-sm">משתמשים מחוקים</p>
+                            <p id="deletedUsers" class="text-3xl font-bold mt-1">0</p>
+                        </div>
+                        <i class="fas fa-user-slash text-5xl text-red-200"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-list ml-2"></i>
+                        רשימת משתמשים
+                    </h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">ID</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">שם</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">מייל</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">משקל נוכחי</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">משקל יעד</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">הרשאה</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">סטטוס</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">התחבר לאחרונה</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="9" class="px-6 py-4 text-center text-gray-500">
+                                    <i class="fas fa-spinner fa-spin text-2xl"></i>
+                                    <p class="mt-2">טוען משתמשים...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const sessionToken = localStorage.getItem('session_token')
+            const userName = localStorage.getItem('user_name')
+            const userRole = localStorage.getItem('user_role')
+
+            // Check admin access
+            if (!sessionToken || userRole !== 'admin') {
+                alert('נדרשת הרשאת Admin! מעביר לעמוד ההתחברות...')
+                window.location.href = '/'
+            }
+
+            document.getElementById('adminName').textContent = userName || 'Admin'
+
+            // Load users
+            async function loadUsers() {
+                try {
+                    const response = await axios.get('/api/admin/users', {
+                        headers: { 'Authorization': 'Bearer ' + sessionToken }
+                    })
+
+                    const users = response.data.users
+
+                    // Update stats
+                    document.getElementById('totalUsers').textContent = users.length
+                    document.getElementById('activeUsers').textContent = users.filter(u => u.is_active && !u.is_deleted).length
+                    document.getElementById('adminUsers').textContent = users.filter(u => u.role === 'admin').length
+                    document.getElementById('deletedUsers').textContent = users.filter(u => u.is_deleted).length
+
+                    // Render table
+                    const tbody = document.getElementById('usersTableBody')
+                    tbody.innerHTML = users.map(user => \`
+                        <tr class="\${user.is_deleted ? 'bg-red-50' : ''}">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">\${user.id}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">\${user.name}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">\${user.email || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">\${user.weight_kg} ק"ג</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">\${user.target_weight_kg} ק"ג</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs rounded-full \${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">
+                                    \${user.role === 'admin' ? '👑 Admin' : 'משתמש'}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs rounded-full \${user.is_deleted ? 'bg-red-100 text-red-800' : (user.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800')}">
+                                    \${user.is_deleted ? '🗑️ נמחק' : (user.is_active ? '✅ פעיל' : '⏸️ מושהה')}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">\${user.last_login ? new Date(user.last_login).toLocaleDateString('he-IL') : 'מעולם לא'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <a href="/dashboard?user=\${user.id}" class="text-indigo-600 hover:text-indigo-900 ml-3" target="_blank">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                                <button onclick="toggleActive(\${user.id}, \${!user.is_active})" class="text-yellow-600 hover:text-yellow-900 ml-3">
+                                    <i class="fas fa-\${user.is_active ? 'pause' : 'play'}-circle"></i>
+                                </button>
+                                <button onclick="toggleAdmin(\${user.id}, '\${user.role}')" class="text-purple-600 hover:text-purple-900 ml-3">
+                                    <i class="fas fa-crown"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    \`).join('')
+                } catch (error) {
+                    alert('שגיאה בטעינת משתמשים: ' + (error.response?.data?.error || error.message))
+                }
+            }
+
+            async function toggleActive(userId, isActive) {
+                try {
+                    await axios.patch(\`/api/admin/users/\${userId}\`, 
+                        { is_active: isActive ? 1 : 0 },
+                        { headers: { 'Authorization': 'Bearer ' + sessionToken } }
+                    )
+                    alert('סטטוס המשתמש עודכן!')
+                    loadUsers()
+                } catch (error) {
+                    alert('שגיאה: ' + (error.response?.data?.error || error.message))
+                }
+            }
+
+            async function toggleAdmin(userId, currentRole) {
+                const newRole = currentRole === 'admin' ? 'user' : 'admin'
+                if (!confirm(\`האם להפוך משתמש זה ל\${newRole === 'admin' ? 'Admin' : 'משתמש רגיל'}?\`)) return
+
+                try {
+                    await axios.patch(\`/api/admin/users/\${userId}\`, 
+                        { role: newRole },
+                        { headers: { 'Authorization': 'Bearer ' + sessionToken } }
+                    )
+                    alert('הרשאות עודכנו!')
+                    loadUsers()
+                } catch (error) {
+                    alert('שגיאה: ' + (error.response?.data?.error || error.message))
+                }
+            }
+
+            function logout() {
                 localStorage.clear()
                 window.location.href = '/'
             }
