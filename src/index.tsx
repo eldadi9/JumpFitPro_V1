@@ -1695,9 +1695,11 @@ app.get('/', (c) => {
                     localStorage.setItem('user_name', response.data.name)
                     localStorage.setItem('user_role', response.data.role)
                     
-                    showMessage('התחברת בהצלחה! מעביר לדשבורד...', 'success')
+                    // Redirect based on role
+                    const isAdmin = response.data.role === 'admin'
+                    showMessage(isAdmin ? 'התחברת כמנהל! מעביר לפאנל ניהול...' : 'התחברת בהצלחה! מעביר לדשבורד...', 'success')
                     setTimeout(() => {
-                        window.location.href = '/dashboard?user=' + response.data.user_id
+                        window.location.href = isAdmin ? '/admin' : '/dashboard?user=' + response.data.user_id
                     }, 1000)
                 } catch (error) {
                     showMessage(error.response?.data?.error || 'שגיאה בהתחברות', 'error')
