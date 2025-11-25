@@ -1695,11 +1695,10 @@ app.get('/', (c) => {
                     localStorage.setItem('user_name', response.data.name)
                     localStorage.setItem('user_role', response.data.role)
                     
-                    // Redirect based on role
-                    const isAdmin = response.data.role === 'admin'
-                    showMessage(isAdmin ? 'התחברת כמנהל! מעביר לפאנל ניהול...' : 'התחברת בהצלחה! מעביר לדשבורד...', 'success')
+                    // Always redirect to dashboard for all users
+                    showMessage('התחברת בהצלחה! מעביר לדשבורד...', 'success')
                     setTimeout(() => {
-                        window.location.href = isAdmin ? '/admin' : '/dashboard?user=' + response.data.user_id
+                        window.location.href = '/dashboard?user=' + response.data.user_id
                     }, 1000)
                 } catch (error) {
                     showMessage(error.response?.data?.error || 'שגיאה בהתחברות', 'error')
@@ -2454,6 +2453,7 @@ app.get('/create-profile', (c) => {
 
                 // Helper function to reset submit button state
                 function resetSubmitButton() {
+                    isSubmitting = false
                     const submitBtn = document.getElementById('submitBtn')
                     const submitBtnText = document.getElementById('submitBtnText')
                     if (submitBtn) {
@@ -2463,12 +2463,22 @@ app.get('/create-profile', (c) => {
                     }
                 }
 
+                // Flag to prevent double submission
+                let isSubmitting = false
+
                 console.log('Adding submit event listener...')
                 profileForm.addEventListener('submit', async (e) => {
-                    console.log('=== Form Submit Event Triggered ===')
                     e.preventDefault()
                     e.stopPropagation()
-                    console.log('Default action prevented and propagation stopped')
+                    
+                    // Prevent double submission
+                    if (isSubmitting) {
+                        console.log('Already submitting, ignoring duplicate submission')
+                        return false
+                    }
+                    
+                    console.log('=== Form Submit Event Triggered ===')
+                    isSubmitting = true
                     
                     // Disable submit button to prevent double submission
                     const submitBtn = document.getElementById('submitBtn')
@@ -2582,30 +2592,31 @@ app.get('/create-profile', (c) => {
             }
 
             // Profile Image Functions
+            // Profile Image Functions - must be global for onclick handlers
             let profileImageBase64 = null
 
-            function handleFileSelect(event) {
+            window.handleFileSelect = function(event) {
                 const file = event.target.files[0]
                 if (file) {
                     const reader = new FileReader()
                     reader.onload = (e) => {
                         profileImageBase64 = e.target.result
-                        showImagePreview(e.target.result)
+                        window.showImagePreview(e.target.result)
                     }
                     reader.readAsDataURL(file)
                 }
             }
 
-            function capturePhoto() {
+            window.capturePhoto = function() {
                 alert('פיצ\'ר צילום תמונה יהיה זמין בקרוב! לעת עתה השתמש ב"העלה תמונה"')
             }
 
-            function showImagePreview(src) {
+            window.showImagePreview = function(src) {
                 document.getElementById('previewImg').src = src
                 document.getElementById('imagePreview').classList.remove('hidden')
             }
 
-            function clearImage() {
+            window.clearImage = function() {
                 profileImageBase64 = null
                 document.getElementById('imagePreview').classList.add('hidden')
                 document.getElementById('fileInput').value = ''
