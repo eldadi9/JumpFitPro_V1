@@ -2423,7 +2423,13 @@ app.get('/workout-timer', async (c) => {
                         timerState.workTime = session.work_seconds;
                         timerState.restTime = session.rest_seconds;
                         timerState.intensity = session.intensity;
+                    } else {
+                        alert('אימון לא נמצא במערכת');
+                        return;
                     }
+                } else {
+                    alert('חסרים פרמטרים (session/plan)');
+                    return;
                 }
                 
                 if (userId) {
