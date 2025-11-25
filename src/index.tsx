@@ -871,6 +871,143 @@ app.get('/api/intensity-levels', async (c) => {
 })
 
 // ========================================
+// API Routes - הישגים (Achievements)
+// ========================================
+
+/**
+ * קבלת כל ההישגים של משתמש
+ */
+app.get('/api/achievements/user/:userId', async (c) => {
+  try {
+    const userId = c.req.param('userId')
+    
+    const { results: achievements } = await c.env.DB.prepare(`
+      SELECT * FROM achievements 
+      WHERE user_id = ? 
+      ORDER BY earned_date DESC
+    `).bind(userId).all()
+    
+    return c.json({ achievements, count: achievements.length })
+  } catch (error) {
+    return c.json({ error: 'שגיאה בקבלת הישגים', details: String(error) }, 500)
+  }
+})
+
+/**
+ * בדיקה ומתן הישגים חדשים
+ */
+app.post('/api/achievements/check/:userId', async (c) => {
+  try {
+    const userId = c.req.param('userId')
+    const newAchievements = []
+    
+    // Get user stats
+    const workoutsCount = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM workout_logs WHERE user_id = ?
+    `).bind(userId).first()
+    
+    const weekWorkouts = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM workout_logs 
+      WHERE user_id = ? 
+      AND workout_date >= date('now', '-7 days')
+    `).bind(userId).first()
+    
+    const weightLoss = await c.env.DB.prepare(`
+      SELECT 
+        (SELECT weight_kg FROM weight_tracking WHERE user_id = ? ORDER BY measurement_date ASC LIMIT 1) as first_weight,
+        (SELECT weight_kg FROM weight_tracking WHERE user_id = ? ORDER BY measurement_date DESC LIMIT 1) as current_weight
+    `).bind(userId, userId).first()
+    
+    // Check existing achievements
+    const { results: existing } = await c.env.DB.prepare(`
+      SELECT achievement_type FROM achievements WHERE user_id = ?
+    `).bind(userId).all()
+    
+    const existingTypes = new Set(existing.map(a => a.achievement_type))
+    
+    // Check for new achievements
+    const achievementChecks = [
+      {
+        type: 'first_workout',
+        condition: workoutsCount.count >= 1 && !existingTypes.has('first_workout'),
+        name: '🥇 אימון ראשון',
+        value: 1
+      },
+      {
+        type: 'workout_5',
+        condition: workoutsCount.count >= 5 && !existingTypes.has('workout_5'),
+        name: '🔥 5 אימונים',
+        value: 5
+      },
+      {
+        type: 'workout_10',
+        condition: workoutsCount.count >= 10 && !existingTypes.has('workout_10'),
+        name: '💪 10 אימונים',
+        value: 10
+      },
+      {
+        type: 'workout_25',
+        condition: workoutsCount.count >= 25 && !existingTypes.has('workout_25'),
+        name: '🎯 25 אימונים',
+        value: 25
+      },
+      {
+        type: 'workout_50',
+        condition: workoutsCount.count >= 50 && !existingTypes.has('workout_50'),
+        name: '🏆 50 אימונים',
+        value: 50
+      },
+      {
+        type: 'week_complete',
+        condition: weekWorkouts.count >= 3 && !existingTypes.has('week_complete'),
+        name: '⭐ שבוע מושלם',
+        value: 3
+      },
+      {
+        type: 'weight_loss_1kg',
+        condition: weightLoss && weightLoss.first_weight && weightLoss.current_weight && 
+                   (weightLoss.first_weight - weightLoss.current_weight >= 1) && 
+                   !existingTypes.has('weight_loss_1kg'),
+        name: '📉 ירידה של 1 ק"ג',
+        value: 1
+      },
+      {
+        type: 'weight_loss_5kg',
+        condition: weightLoss && weightLoss.first_weight && weightLoss.current_weight && 
+                   (weightLoss.first_weight - weightLoss.current_weight >= 5) && 
+                   !existingTypes.has('weight_loss_5kg'),
+        name: '🎉 ירידה של 5 ק"ג',
+        value: 5
+      }
+    ]
+    
+    // Award new achievements
+    for (const check of achievementChecks) {
+      if (check.condition) {
+        await c.env.DB.prepare(`
+          INSERT INTO achievements (user_id, achievement_type, achievement_name, achievement_value, earned_date)
+          VALUES (?, ?, ?, ?, date('now'))
+        `).bind(userId, check.type, check.name, check.value).run()
+        
+        newAchievements.push({
+          type: check.type,
+          name: check.name,
+          value: check.value
+        })
+      }
+    }
+    
+    return c.json({ 
+      newAchievements, 
+      count: newAchievements.length,
+      message: newAchievements.length > 0 ? 'הישגים חדשים!' : 'אין הישגים חדשים'
+    })
+  } catch (error) {
+    return c.json({ error: 'שגיאה בבדיקת הישגים', details: String(error) }, 500)
+  }
+})
+
+// ========================================
 // Frontend Routes
 // ========================================
 
@@ -1391,6 +1528,22 @@ app.get('/dashboard', (c) => {
                 <p id="weekRemaining" class="text-sm text-gray-600 text-center">נותרו עוד 3 אימונים השבוע</p>
             </div>
 
+            <!-- Workout Reminders -->
+            <div id="workoutReminders" class="mb-8">
+                <!-- Reminders will be dynamically inserted here -->
+            </div>
+
+            <!-- Achievements Section -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-trophy text-yellow-500 ml-2"></i>
+                    הישגים
+                </h3>
+                <div id="achievementsContainer" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Achievements will be dynamically inserted here -->
+                </div>
+            </div>
+
             <!-- Charts Section -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <!-- Weight Chart -->
@@ -1652,6 +1805,7 @@ app.get('/dashboard', (c) => {
               // Load charts
               loadWeightChart()
               loadCaloriesChart()
+              loadAchievements()
             } catch (error) {
               console.error('Error loading dashboard:', error)
               console.error('Error details:', error.response?.data || error.message)
@@ -1671,8 +1825,89 @@ app.get('/dashboard', (c) => {
               
               const percentage = Math.min(100, (data.completed / data.target) * 100)
               document.getElementById('weekProgressBar').style.width = percentage + '%'
+              
+              // Show reminders after loading progress
+              showWorkoutReminders(data)
             } catch (error) {
               console.error('Error loading weekly progress:', error)
+            }
+          }
+          
+          async function showWorkoutReminders(weekData) {
+            try {
+              // Get last workout date
+              const workoutsResponse = await axios.get(\`/api/workouts/user/\${userId}\`)
+              const workouts = workoutsResponse.data.workouts
+              
+              const reminders = []
+              
+              // Check if no workout today
+              const today = new Date().toISOString().split('T')[0]
+              const todayWorkout = workouts.find(w => w.workout_date === today)
+              
+              if (!todayWorkout && workouts.length > 0) {
+                const lastWorkout = workouts[0]
+                const lastDate = new Date(lastWorkout.workout_date)
+                const now = new Date()
+                const daysSince = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24))
+                
+                if (daysSince >= 1) {
+                  reminders.push({
+                    type: 'warning',
+                    icon: 'fa-calendar-xmark',
+                    text: \`עבר \${daysSince} \${daysSince === 1 ? 'יום' : 'ימים'} ללא אימון - זמן לקפוץ! 🔥\`,
+                    color: 'orange'
+                  })
+                }
+              }
+              
+              // Check weekly goal progress
+              if (weekData.remaining > 0) {
+                reminders.push({
+                  type: 'info',
+                  icon: 'fa-bullseye',
+                  text: \`עוד \${weekData.remaining} אימונים ליעד השבועי! 💪\`,
+                  color: 'blue'
+                })
+              } else if (weekData.completed >= weekData.target) {
+                reminders.push({
+                  type: 'success',
+                  icon: 'fa-trophy',
+                  text: 'יעד שבועי הושלם! אתה/את מדהים/ה! 🎉',
+                  color: 'green'
+                })
+              }
+              
+              // Check if user has NO workouts at all
+              if (workouts.length === 0) {
+                reminders.push({
+                  type: 'info',
+                  icon: 'fa-rocket',
+                  text: 'בואו נתחיל! האימון הראשון שלך מחכה 🚀',
+                  color: 'indigo'
+                })
+              }
+              
+              // Display reminders
+              if (reminders.length > 0) {
+                const colors = {
+                  orange: 'bg-orange-50 border-orange-200 text-orange-800',
+                  blue: 'bg-blue-50 border-blue-200 text-blue-800',
+                  green: 'bg-green-50 border-green-200 text-green-800',
+                  indigo: 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                }
+                
+                const remindersHtml = reminders.map(r => \`
+                  <div class="rounded-xl border-2 \${colors[r.color]} p-4 flex items-center gap-3 animate-pulse">
+                    <i class="fas \${r.icon} text-2xl"></i>
+                    <p class="font-semibold">\${r.text}</p>
+                  </div>
+                \`).join('')
+                
+                document.getElementById('workoutReminders').innerHTML = remindersHtml
+              }
+            } catch (error) {
+              console.error('Error showing reminders:', error)
             }
           }
 
@@ -1687,25 +1922,103 @@ app.get('/dashboard', (c) => {
                 return
               }
               
+              // Calculate trend line (linear regression)
+              const weights = data.map(d => d.weight)
+              const n = weights.length
+              const indices = Array.from({length: n}, (_, i) => i)
+              const sumX = indices.reduce((a, b) => a + b, 0)
+              const sumY = weights.reduce((a, b) => a + b, 0)
+              const sumXY = indices.reduce((sum, x, i) => sum + x * weights[i], 0)
+              const sumX2 = indices.reduce((sum, x) => sum + x * x, 0)
+              
+              const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+              const intercept = (sumY - slope * sumX) / n
+              const trendLine = indices.map(i => slope * i + intercept)
+              
+              // Calculate % change from start
+              const startWeight = weights[0]
+              const currentWeight = weights[weights.length - 1]
+              const percentChange = (((currentWeight - startWeight) / startWeight) * 100).toFixed(1)
+              const changeText = percentChange > 0 ? \`+\${percentChange}%\` : \`\${percentChange}%\`
+              
+              // Color points based on trend (green = down, red = up)
+              const pointColors = weights.map((weight, i) => {
+                if (i === 0) return '#667eea'
+                return weight < weights[i-1] ? '#10b981' : weight > weights[i-1] ? '#ef4444' : '#667eea'
+              })
+              
               const ctx = document.getElementById('weightChart').getContext('2d')
               new Chart(ctx, {
                 type: 'line',
                 data: {
                   labels: data.map(d => d.date),
-                  datasets: [{
-                    label: 'משקל (ק"ג)',
-                    data: data.map(d => d.weight),
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                  }]
+                  datasets: [
+                    {
+                      label: 'משקל (ק"ג)',
+                      data: weights,
+                      borderColor: '#667eea',
+                      backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                      tension: 0.4,
+                      fill: true,
+                      pointBackgroundColor: pointColors,
+                      pointBorderColor: pointColors,
+                      pointRadius: 6,
+                      pointHoverRadius: 8,
+                      pointBorderWidth: 2
+                    },
+                    {
+                      label: 'מגמה',
+                      data: trendLine,
+                      borderColor: 'rgba(251, 191, 36, 0.6)',
+                      borderDash: [5, 5],
+                      borderWidth: 2,
+                      fill: false,
+                      pointRadius: 0,
+                      tension: 0
+                    }
+                  ]
                 },
                 options: {
                   responsive: true,
                   maintainAspectRatio: true,
+                  animation: {
+                    duration: 1500,
+                    easing: 'easeInOutQuart'
+                  },
                   plugins: {
-                    legend: { display: false }
+                    legend: { 
+                      display: true,
+                      position: 'top',
+                      labels: {
+                        font: { size: 12 },
+                        usePointStyle: true
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        title: (items) => items[0].label,
+                        label: (context) => {
+                          if (context.datasetIndex === 1) return 'מגמה: ' + context.parsed.y.toFixed(1) + ' ק"ג'
+                          return 'משקל: ' + context.parsed.y + ' ק"ג'
+                        },
+                        afterLabel: (context) => {
+                          if (context.datasetIndex === 0 && context.dataIndex > 0) {
+                            const prev = weights[context.dataIndex - 1]
+                            const curr = weights[context.dataIndex]
+                            const diff = curr - prev
+                            const diffText = diff > 0 ? \`+\${diff.toFixed(1)}\` : diff.toFixed(1)
+                            return \`שינוי: \${diffText} ק"ג\`
+                          }
+                          return ''
+                        }
+                      }
+                    },
+                    title: {
+                      display: true,
+                      text: \`שינוי כולל: \${changeText}\`,
+                      font: { size: 14, weight: 'bold' },
+                      color: percentChange < 0 ? '#10b981' : '#ef4444'
+                    }
                   },
                   scales: {
                     y: {
@@ -1774,6 +2087,34 @@ app.get('/dashboard', (c) => {
               })
             } catch (error) {
               console.error('Error loading calories chart:', error)
+            }
+          }
+
+          async function loadAchievements() {
+            try {
+              // Check for new achievements
+              await axios.post(\`/api/achievements/check/\${userId}\`)
+              
+              // Load all achievements
+              const response = await axios.get(\`/api/achievements/user/\${userId}\`)
+              const achievements = response.data.achievements
+              
+              if (achievements.length === 0) {
+                document.getElementById('achievementsContainer').innerHTML = 
+                  '<p class="text-gray-500 text-center col-span-full">עדיין אין הישגים - המשך להתאמן! 💪</p>'
+                return
+              }
+              
+              const achievementsHtml = achievements.map(a => \`
+                <div class="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-4 text-center hover:scale-105 transition-transform">
+                  <h4 class="text-3xl font-bold text-gray-800 mb-2">\${a.achievement_name}</h4>
+                  <p class="text-xs text-gray-500 mt-2">\${new Date(a.earned_date).toLocaleDateString('he-IL')}</p>
+                </div>
+              \`).join('')
+              
+              document.getElementById('achievementsContainer').innerHTML = achievementsHtml
+            } catch (error) {
+              console.error('Error loading achievements:', error)
             }
           }
 
