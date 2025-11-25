@@ -1550,7 +1550,7 @@ app.get('/', (c) => {
           .animate-slide-in { animation: slideIn 0.5s ease-out; }
         </style>
     </head>
-    <body class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 min-h-screen flex items-center justify-center p-4">
+    <body class="bg-white min-h-screen flex items-center justify-center p-4">
         <!-- Welcome Modal (Hidden by default) -->
         <div id="welcomeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center animate-slide-in">
@@ -1575,47 +1575,26 @@ app.get('/', (c) => {
         </div>
 
         <!-- Main Auth Container -->
-        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-4xl w-full">
-            <div class="flex flex-col md:flex-row">
-                <!-- Left Side - Branding -->
-                <div class="bg-gradient-to-br from-indigo-600 to-purple-600 p-12 text-white md:w-1/2">
-                    <div class="flex flex-col items-center justify-center h-full text-center">
-                        <div class="flex items-center justify-center mb-8">
-                            <img src="/static/logo.svg" alt="JumpFitPro" class="h-20" />
-                        </div>
-                        <p class="text-lg mb-8">המסע שלך לירידה במשקל מתחיל כאן!</p>
-                        <div class="space-y-3 text-right">
-                            <div class="flex items-center gap-3">
-                                <i class="fas fa-check-circle text-2xl"></i>
-                                <span>תכניות אימון מותאמות אישית</span>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <i class="fas fa-check-circle text-2xl"></i>
-                                <span>מעקב קלוריות מדעי</span>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <i class="fas fa-check-circle text-2xl"></i>
-                                <span>גרפים והישגים</span>
-                            </div>
-                        </div>
-                    </div>
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden max-w-md w-full shadow-sm">
+            <div class="p-8">
+                <!-- Logo -->
+                <div class="flex items-center justify-center mb-8">
+                    <img src="/static/logo.svg" alt="JumpFitPro" class="h-24" />
                 </div>
 
-                <!-- Right Side - Auth Forms -->
-                <div class="p-12 md:w-1/2">
-                    <!-- Toggle Buttons -->
-                    <div class="flex gap-2 mb-8 bg-gray-100 rounded-lg p-1">
-                        <button id="loginTabBtn" onclick="showLoginTab()" class="flex-1 py-3 rounded-lg font-bold transition duration-300 bg-white shadow-md text-indigo-600">
-                            התחברות
-                        </button>
-                        <button id="registerTabBtn" onclick="showRegisterTab()" class="flex-1 py-3 rounded-lg font-bold transition duration-300 text-gray-600">
-                            הרשמה
-                        </button>
-                    </div>
+                <!-- Toggle Buttons -->
+                <div class="flex gap-2 mb-8 border-b border-gray-200">
+                    <button id="loginTabBtn" onclick="showLoginTab()" class="flex-1 py-3 font-bold transition duration-300 border-b-2 border-indigo-600 text-indigo-600">
+                        התחברות
+                    </button>
+                    <button id="registerTabBtn" onclick="showRegisterTab()" class="flex-1 py-3 font-bold transition duration-300 text-gray-500">
+                        הרשמה
+                    </button>
+                </div>
 
-                    <!-- Login Form -->
-                    <div id="loginForm" class="space-y-4">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">ברוך שובך! 👋</h2>
+                <!-- Login Form -->
+                <div id="loginForm" class="space-y-4">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">התחברות</h2>
                         <div>
                             <label class="block text-gray-700 font-bold mb-2">מייל</label>
                             <input type="email" id="loginEmail" placeholder="your@email.com" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -1624,8 +1603,7 @@ app.get('/', (c) => {
                             <label class="block text-gray-700 font-bold mb-2">סיסמה</label>
                             <input type="password" id="loginPassword" placeholder="••••••••" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                         </div>
-                        <button onclick="handleLogin()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg transition duration-300 transform hover:scale-105">
-                            <i class="fas fa-sign-in-alt ml-2"></i>
+                        <button onclick="handleLogin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition duration-200">
                             התחבר
                         </button>
                         <div class="text-center mt-4 space-y-2">
@@ -1641,10 +1619,9 @@ app.get('/', (c) => {
                         </div>
                     </div>
 
-                    <!-- Register Form (Hidden) - שלב 1: רק מייל וסיסמה -->
-                    <div id="registerForm" class="hidden space-y-4">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">הצטרף אלינו! 🚀</h2>
-                        <p class="text-gray-600 text-sm mb-4">צור חשבון חדש והתחל את המסע שלך</p>
+                <!-- Register Form (Hidden) - שלב 1: רק מייל וסיסמה -->
+                <div id="registerForm" class="hidden space-y-4">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">הרשמה</h2>
                         
                         <div>
                             <label class="block text-gray-700 font-bold mb-2">מייל *</label>
@@ -1660,8 +1637,7 @@ app.get('/', (c) => {
                             <input type="password" id="regPasswordConfirm" required placeholder="הקלד סיסמה שוב" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                         </div>
                         
-                        <button onclick="handleQuickRegister()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg transition duration-300 transform hover:scale-105 shadow-lg">
-                            <i class="fas fa-user-plus ml-2"></i>
+                        <button onclick="handleQuickRegister()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition duration-200">
                             הרשם עכשיו
                         </button>
                         
@@ -1680,19 +1656,19 @@ app.get('/', (c) => {
             function showLoginTab() {
                 document.getElementById('loginForm').classList.remove('hidden')
                 document.getElementById('registerForm').classList.add('hidden')
-                document.getElementById('loginTabBtn').classList.add('bg-white', 'shadow-md', 'text-indigo-600')
-                document.getElementById('loginTabBtn').classList.remove('text-gray-600')
-                document.getElementById('registerTabBtn').classList.remove('bg-white', 'shadow-md', 'text-indigo-600')
-                document.getElementById('registerTabBtn').classList.add('text-gray-600')
+                document.getElementById('loginTabBtn').classList.add('border-b-2', 'border-indigo-600', 'text-indigo-600')
+                document.getElementById('loginTabBtn').classList.remove('text-gray-500')
+                document.getElementById('registerTabBtn').classList.remove('border-b-2', 'border-indigo-600', 'text-indigo-600')
+                document.getElementById('registerTabBtn').classList.add('text-gray-500')
             }
 
             function showRegisterTab() {
                 document.getElementById('registerForm').classList.remove('hidden')
                 document.getElementById('loginForm').classList.add('hidden')
-                document.getElementById('registerTabBtn').classList.add('bg-white', 'shadow-md', 'text-indigo-600')
-                document.getElementById('registerTabBtn').classList.remove('text-gray-600')
-                document.getElementById('loginTabBtn').classList.remove('bg-white', 'shadow-md', 'text-indigo-600')
-                document.getElementById('loginTabBtn').classList.add('text-gray-600')
+                document.getElementById('registerTabBtn').classList.add('border-b-2', 'border-indigo-600', 'text-indigo-600')
+                document.getElementById('registerTabBtn').classList.remove('text-gray-500')
+                document.getElementById('loginTabBtn').classList.remove('border-b-2', 'border-indigo-600', 'text-indigo-600')
+                document.getElementById('loginTabBtn').classList.add('text-gray-500')
             }
 
             function showMessage(text, type) {
@@ -2300,7 +2276,6 @@ app.get('/create-profile', (c) => {
                         <label class="block text-gray-700 font-bold mb-2 text-right">מין</label>
                         <select id="gender" required 
                             class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-right bg-white">
-                            <option value="">זכר</option>
                             <option value="male">זכר</option>
                             <option value="female">נקבה</option>
                         </select>
@@ -2309,14 +2284,14 @@ app.get('/create-profile', (c) => {
                     <!-- גיל -->
                     <div>
                         <label class="block text-gray-700 font-bold mb-2 text-right">גיל</label>
-                        <input type="number" id="age" min="10" max="100"
+                        <input type="number" id="age" min="10" max="100" required
                             class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-right">
                     </div>
 
                     <!-- גובה (ס"מ) -->
                     <div>
                         <label class="block text-gray-700 font-bold mb-2 text-right">גובה (ס"מ)</label>
-                        <input type="number" id="height_cm" min="100" max="250"
+                        <input type="number" id="height_cm" min="100" max="250" required
                             class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-right">
                     </div>
 
@@ -2439,37 +2414,67 @@ app.get('/create-profile', (c) => {
             document.getElementById('profileForm').addEventListener('submit', async (e) => {
                 e.preventDefault()
 
+                // Validation
+                const name = document.getElementById('name').value.trim()
+                const age = parseInt(document.getElementById('age').value)
+                const height = parseInt(document.getElementById('height_cm').value)
+                const weight = parseFloat(document.getElementById('weight_kg').value)
+                const targetWeight = parseFloat(document.getElementById('target_weight_kg').value)
+
+                if (!name || !age || !height || !weight || !targetWeight) {
+                    showMessage('נא למלא את כל השדות החובה', 'error')
+                    return
+                }
+
+                if (age < 10 || age > 100) {
+                    showMessage('גיל צריך להיות בין 10 ל-100', 'error')
+                    return
+                }
+
+                if (height < 100 || height > 250) {
+                    showMessage('גובה צריך להיות בין 100 ל-250 ס"מ', 'error')
+                    return
+                }
+
+                if (weight < 30 || weight > 300) {
+                    showMessage('משקל צריך להיות בין 30 ל-300 ק"ג', 'error')
+                    return
+                }
+
                 const formData = {
                     user_id: parseInt(userId),
-                    name: document.getElementById('name').value,
-                    age: parseInt(document.getElementById('age').value),
+                    name: name,
+                    age: age,
                     gender: document.getElementById('gender').value,
-                    height_cm: parseInt(document.getElementById('height_cm').value),
-                    weight_kg: parseFloat(document.getElementById('weight_kg').value),
-                    target_weight_kg: parseFloat(document.getElementById('target_weight_kg').value),
+                    height_cm: height,
+                    weight_kg: weight,
+                    target_weight_kg: targetWeight,
                     workouts_per_week: parseInt(document.getElementById('workouts_per_week').value),
                     current_level: document.getElementById('current_level').value,
-                    preferred_intensity: 'medium', // Default value
+                    preferred_intensity: 'medium',
                     phone: document.getElementById('phone').value || null,
-                    profile_image: profileImageBase64 // תמונת פרופיל
+                    profile_image: profileImageBase64
                 }
+
+                console.log('Sending profile data:', formData)
 
                 try {
                     const response = await axios.post('/api/auth/complete-profile', formData)
+                    console.log('Profile response:', response.data)
                     
                     if (response.data.success) {
                         showMessage('הפרופיל נוצר בהצלחה! מעביר לדשבורד...', 'success')
                         localStorage.setItem('user_name', formData.name)
                         
-                        // Show welcome modal
                         setTimeout(() => {
                             window.location.href = '/dashboard?user=' + userId
-                        }, 2000)
+                        }, 1500)
                     } else {
                         showMessage(response.data.error || 'שגיאה ביצירת פרופיל', 'error')
                     }
                 } catch (error) {
-                    showMessage(error.response?.data?.error || 'שגיאה בשרת', 'error')
+                    console.error('Profile creation error:', error)
+                    showMessage(error.response?.data?.error || error.message || 'שגיאה בשרת', 'error')
                 }
             })
 
