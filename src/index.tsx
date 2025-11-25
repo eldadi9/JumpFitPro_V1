@@ -2140,9 +2140,466 @@ app.get('/workout-timer', async (c) => {
     return c.redirect(`/dashboard?user=${userId || 1}`)
   }
 
-  // Forward to static HTML file with proper URL
-  const url = new URL(c.req.url)
-  return c.redirect(`/static/workout-timer.html${url.search}`)
+  // Return HTML directly (Cloudflare Workers cannot serve static HTML files)
+  // TODO: This is a workaround - ideally workout-timer should be a separate route
+  return c.html(`
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>טיימר אימון - קפיצה בחבל</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        .timer-circle {
+            width: 300px;
+            height: 300px;
+            position: relative;
+            margin: 0 auto;
+        }
+        .timer-display {
+            font-size: 4rem;
+            font-weight: bold;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .pulse {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .work-phase {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .rest-phase {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        .progress-bar-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <img src="/static/logo.svg" alt="קפיצה לחיים" class="h-12" />
+                <button onclick="exitWorkout()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
+                    <i class="fas fa-times ml-2"></i>
+                    יציאה
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Timer -->
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Timer Card -->
+        <div id="timerCard" class="bg-white rounded-xl shadow-2xl p-8 mb-6 transition-all duration-500">
+            <!-- Phase Indicator -->
+            <div class="text-center mb-6">
+                <div id="phaseIndicator" class="inline-block px-6 py-3 rounded-full text-2xl font-bold">
+                    מוכן להתחלה
+                </div>
+            </div>
+
+            <!-- Timer Circle -->
+            <div class="timer-circle mb-6">
+                <svg width="300" height="300" style="transform: rotate(-90deg)">
+                    <circle cx="150" cy="150" r="140" stroke="#e5e7eb" stroke-width="12" fill="none"/>
+                    <circle id="progressCircle" cx="150" cy="150" r="140" stroke="#667eea" stroke-width="12" fill="none" 
+                            stroke-dasharray="879.6" stroke-dashoffset="879.6" stroke-linecap="round"
+                            style="transition: stroke-dashoffset 0.3s ease"/>
+                </svg>
+                <div class="timer-display" id="timerDisplay">00:00</div>
+            </div>
+
+            <!-- Current Set Info -->
+            <div class="text-center mb-6">
+                <div class="text-4xl font-bold text-gray-800 mb-2" id="setCounter">סט 0/0</div>
+                <div class="text-xl text-gray-600" id="nextPhaseInfo">לחץ התחל כדי להתחיל</div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="flex justify-center gap-4 mb-6">
+                <button id="startBtn" onclick="startTimer()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl">
+                    <i class="fas fa-play ml-2"></i>
+                    התחל
+                </button>
+                <button id="pauseBtn" onclick="pauseTimer()" class="hidden bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-4 px-8 rounded-lg text-xl">
+                    <i class="fas fa-pause ml-2"></i>
+                    השהה
+                </button>
+                <button id="resumeBtn" onclick="resumeTimer()" class="hidden bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl">
+                    <i class="fas fa-play ml-2"></i>
+                    המשך
+                </button>
+                <button id="skipBtn" onclick="skipPhase()" class="hidden bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 px-8 rounded-lg text-xl">
+                    <i class="fas fa-forward ml-2"></i>
+                    דלג
+                </button>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-3xl font-bold text-indigo-600" id="totalTime">0:00</div>
+                    <div class="text-sm text-gray-600">זמן כולל</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-3xl font-bold text-orange-600" id="caloriesBurned">0</div>
+                    <div class="text-sm text-gray-600">קלוריות</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-3xl font-bold text-green-600" id="completedSets">0</div>
+                    <div class="text-sm text-gray-600">סטים הושלמו</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar at Bottom -->
+        <div class="progress-bar-container">
+            <div id="progressBarFill" class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+
+        <!-- Completion Modal -->
+        <div id="completionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
+                <div class="text-6xl mb-4">🎉</div>
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">כל הכבוד!</h2>
+                <p class="text-xl text-gray-600 mb-6">סיימת את האימון בהצלחה!</p>
+                
+                <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                    <div class="grid grid-cols-2 gap-4 text-right">
+                        <div>
+                            <div class="text-sm text-gray-600">זמן כולל</div>
+                            <div class="text-2xl font-bold text-indigo-600" id="finalTime"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">קלוריות</div>
+                            <div class="text-2xl font-bold text-orange-600" id="finalCalories"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">סטים</div>
+                            <div class="text-2xl font-bold text-green-600" id="finalSets"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">עצימות</div>
+                            <div class="text-2xl font-bold text-purple-600" id="finalIntensity"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="saveWorkout()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg">
+                        <i class="fas fa-save ml-2"></i>
+                        שמור אימון
+                    </button>
+                    <button onclick="exitWorkout()" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-lg">
+                        חזור לדשבורד
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Audio Elements -->
+    <audio id="startSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGD0fPTgjMGHm7A7+OZSR0RVq3r8K1gGQU+kdvvxnMjBSuBzvLaiTcIGWe77OWdTQwNUKnk8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8A==" type="audio/wav">
+    </audio>
+    <audio id="endSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGD0fPTgjMGHm7A7+OZSR0RVq3r8K1gGQU+kdvvxnMjBSuBzvLaiTcIGWe77OWdTQwNUKnk8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8LViFAk5j9vyxnksBS2Ay/HajDkIGWi+7+SbTQwMUKjj8A==" type="audio/wav">
+    </audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user');
+        const sessionId = urlParams.get('session');
+        const planId = urlParams.get('plan');
+
+        // Timer state
+        let timerState = {
+            isRunning: false,
+            isPaused: false,
+            currentPhase: 'ready',
+            currentSet: 0,
+            totalSets: 0,
+            workTime: 0,
+            restTime: 0,
+            currentTime: 0,
+            totalWorkTime: 0,
+            completedSets: 0,
+            startTime: null,
+            timerInterval: null,
+            userWeight: 0,
+            intensity: 'medium'
+        };
+
+        async function loadSessionData() {
+            try {
+                if (sessionId && planId) {
+                    const response = await axios.get(\`/api/plans/\${planId}\`);
+                    const session = response.data.sessions.find(s => s.id == sessionId);
+                    
+                    if (session) {
+                        timerState.totalSets = session.sets_count;
+                        timerState.workTime = session.work_seconds;
+                        timerState.restTime = session.rest_seconds;
+                        timerState.intensity = session.intensity;
+                    }
+                }
+                
+                if (userId) {
+                    const userResponse = await axios.get(\`/api/users/\${userId}\`);
+                    timerState.userWeight = userResponse.data.user.weight_kg;
+                }
+                
+                updateSetCounter();
+            } catch (error) {
+                console.error('Error loading session:', error);
+                alert('שגיאה בטעינת נתוני אימון');
+            }
+        }
+
+        function startTimer() {
+            if (timerState.totalSets === 0) {
+                alert('לא נטענו נתוני אימון');
+                return;
+            }
+            
+            timerState.isRunning = true;
+            timerState.currentSet = 1;
+            timerState.currentPhase = 'work';
+            timerState.currentTime = timerState.workTime;
+            timerState.startTime = Date.now();
+            
+            document.getElementById('startBtn').classList.add('hidden');
+            document.getElementById('pauseBtn').classList.remove('hidden');
+            document.getElementById('skipBtn').classList.remove('hidden');
+            
+            playSound('startSound');
+            updateUI();
+            startTimerInterval();
+        }
+
+        function startTimerInterval() {
+            timerState.timerInterval = setInterval(() => {
+                if (!timerState.isPaused) {
+                    timerState.currentTime--;
+                    
+                    if (timerState.currentTime <= 0) {
+                        handlePhaseComplete();
+                    }
+                    
+                    updateUI();
+                }
+            }, 1000);
+        }
+
+        function handlePhaseComplete() {
+            playSound('endSound');
+            
+            if (timerState.currentPhase === 'work') {
+                timerState.totalWorkTime += timerState.workTime;
+                
+                if (timerState.currentSet < timerState.totalSets) {
+                    timerState.currentPhase = 'rest';
+                    timerState.currentTime = timerState.restTime;
+                } else {
+                    timerState.completedSets = timerState.currentSet;
+                    completeWorkout();
+                    return;
+                }
+            } else if (timerState.currentPhase === 'rest') {
+                timerState.currentSet++;
+                timerState.currentPhase = 'work';
+                timerState.currentTime = timerState.workTime;
+                playSound('startSound');
+            }
+            
+            updateUI();
+        }
+
+        function pauseTimer() {
+            timerState.isPaused = true;
+            document.getElementById('pauseBtn').classList.add('hidden');
+            document.getElementById('resumeBtn').classList.remove('hidden');
+        }
+
+        function resumeTimer() {
+            timerState.isPaused = false;
+            document.getElementById('pauseBtn').classList.remove('hidden');
+            document.getElementById('resumeBtn').classList.add('hidden');
+        }
+
+        function skipPhase() {
+            if (confirm('האם אתה בטוח שברצונך לדלג על שלב זה?')) {
+                timerState.currentTime = 0;
+            }
+        }
+
+        function updateUI() {
+            const minutes = Math.floor(timerState.currentTime / 60);
+            const seconds = timerState.currentTime % 60;
+            document.getElementById('timerDisplay').textContent = 
+                \`\${minutes.toString().padStart(2, '0')}:\${seconds.toString().padStart(2, '0')}\`;
+            
+            const phaseIndicator = document.getElementById('phaseIndicator');
+            const timerCard = document.getElementById('timerCard');
+            
+            if (timerState.currentPhase === 'work') {
+                phaseIndicator.textContent = '🔥 קפיצה!';
+                phaseIndicator.className = 'inline-block px-6 py-3 rounded-full text-2xl font-bold bg-indigo-600 text-white pulse';
+                timerCard.classList.remove('rest-phase');
+                timerCard.classList.add('work-phase');
+            } else if (timerState.currentPhase === 'rest') {
+                phaseIndicator.textContent = '⏸️ מנוחה';
+                phaseIndicator.className = 'inline-block px-6 py-3 rounded-full text-2xl font-bold bg-orange-500 text-white';
+                timerCard.classList.remove('work-phase');
+                timerCard.classList.add('rest-phase');
+            }
+            
+            document.getElementById('setCounter').textContent = 
+                \`סט \${timerState.currentSet}/\${timerState.totalSets}\`;
+            
+            if (timerState.currentPhase === 'work') {
+                document.getElementById('nextPhaseInfo').textContent = 
+                    \`הבא: מנוחה \${timerState.restTime} שניות\`;
+            } else if (timerState.currentPhase === 'rest') {
+                document.getElementById('nextPhaseInfo').textContent = 
+                    \`הבא: קפיצה \${timerState.workTime} שניות\`;
+            }
+            
+            const maxTime = timerState.currentPhase === 'work' ? timerState.workTime : timerState.restTime;
+            const progress = (maxTime - timerState.currentTime) / maxTime;
+            const circumference = 879.6;
+            const offset = circumference - (progress * circumference);
+            document.getElementById('progressCircle').style.strokeDashoffset = offset;
+            
+            if (timerState.startTime) {
+                const elapsedSeconds = Math.floor((Date.now() - timerState.startTime) / 1000);
+                const totalMinutes = Math.floor(elapsedSeconds / 60);
+                const totalSeconds = elapsedSeconds % 60;
+                document.getElementById('totalTime').textContent = 
+                    \`\${totalMinutes}:\${totalSeconds.toString().padStart(2, '0')}\`;
+            }
+            
+            const workMinutes = timerState.totalWorkTime / 60;
+            const calories = calculateCalories(workMinutes);
+            document.getElementById('caloriesBurned').textContent = Math.round(calories);
+            
+            const completedForDisplay = timerState.currentPhase === 'work' ? 
+                timerState.currentSet - 1 : timerState.currentSet;
+            document.getElementById('completedSets').textContent = completedForDisplay;
+            
+            const totalProgress = (timerState.currentSet - 1 + 
+                (timerState.currentPhase === 'rest' ? 1 : (timerState.workTime - timerState.currentTime) / timerState.workTime)) 
+                / timerState.totalSets;
+            document.getElementById('progressBarFill').style.width = (totalProgress * 100) + '%';
+        }
+
+        function updateSetCounter() {
+            document.getElementById('setCounter').textContent = \`סט 0/\${timerState.totalSets}\`;
+            document.getElementById('nextPhaseInfo').textContent = 
+                \`\${timerState.totalSets} סטים × \${timerState.workTime} שניות קפיצה / \${timerState.restTime} שניות מנוחה\`;
+        }
+
+        function calculateCalories(minutes) {
+            const metValues = { easy: 8.8, medium: 11.8, hard: 12.3 };
+            const met = metValues[timerState.intensity] || 11.8;
+            return 0.0175 * met * timerState.userWeight * minutes;
+        }
+
+        function playSound(soundId) {
+            const sound = document.getElementById(soundId);
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('Audio play failed:', e));
+        }
+
+        function completeWorkout() {
+            clearInterval(timerState.timerInterval);
+            timerState.isRunning = false;
+            
+            const totalSeconds = Math.floor((Date.now() - timerState.startTime) / 1000);
+            const totalMinutes = Math.floor(totalSeconds / 60);
+            const remainingSeconds = totalSeconds % 60;
+            
+            const workMinutes = timerState.totalWorkTime / 60;
+            const calories = calculateCalories(workMinutes);
+            
+            document.getElementById('finalTime').textContent = 
+                \`\${totalMinutes}:\${remainingSeconds.toString().padStart(2, '0')}\`;
+            document.getElementById('finalCalories').textContent = Math.round(calories);
+            document.getElementById('finalSets').textContent = timerState.completedSets;
+            document.getElementById('finalIntensity').textContent = 
+                timerState.intensity === 'easy' ? 'קל' : 
+                timerState.intensity === 'medium' ? 'בינוני' : 'קשה';
+            
+            document.getElementById('completionModal').classList.remove('hidden');
+        }
+
+        async function saveWorkout() {
+            const workMinutes = timerState.totalWorkTime / 60;
+            const calories = calculateCalories(workMinutes);
+            
+            const workoutData = {
+                user_id: parseInt(userId),
+                plan_id: planId ? parseInt(planId) : null,
+                session_id: sessionId ? parseInt(sessionId) : null,
+                workout_date: new Date().toISOString().split('T')[0],
+                work_minutes: workMinutes,
+                sets_completed: timerState.completedSets,
+                intensity: timerState.intensity,
+                notes: \`אימון הושלם דרך הטיימר\`
+            };
+            
+            try {
+                const response = await axios.post('/api/workouts', workoutData);
+                if (response.data.success) {
+                    alert('אימון נשמר בהצלחה! 🎉');
+                    window.location.href = \`/dashboard?user=\${userId}\`;
+                }
+            } catch (error) {
+                alert('שגיאה בשמירת אימון: ' + (error.response?.data?.error || error.message));
+            }
+        }
+
+        function exitWorkout() {
+            if (timerState.isRunning && !confirm('האם אתה בטוח שברצונך לצאת? האימון לא יישמר.')) {
+                return;
+            }
+            window.location.href = \`/dashboard?user=\${userId}\`;
+        }
+
+        loadSessionData();
+    </script>
+</body>
+</html>
+  `)
 })
 
 /**
