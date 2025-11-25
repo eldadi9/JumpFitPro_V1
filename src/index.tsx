@@ -1554,7 +1554,9 @@ app.get('/', (c) => {
         <!-- Welcome Modal (Hidden by default) -->
         <div id="welcomeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center animate-slide-in">
-                <div class="text-6xl mb-4">🪢🎉</div>
+                <div class="flex items-center justify-center mb-4">
+                    <img src="/static/logo.svg" alt="JumpFitPro" class="h-24" />
+                </div>
                 <h2 class="text-3xl font-bold text-gray-800 mb-4">יאללה, בואו נקפוץ! 🚀</h2>
                 <p class="text-gray-600 mb-4 text-lg">
                     <strong>ברוכים הבאים למועדון הכי קופץ בעולם!</strong> 🌍
@@ -1578,11 +1580,9 @@ app.get('/', (c) => {
                 <!-- Left Side - Branding -->
                 <div class="bg-gradient-to-br from-indigo-600 to-purple-600 p-12 text-white md:w-1/2">
                     <div class="flex flex-col items-center justify-center h-full text-center">
-                        <div class="flex items-center justify-center mb-6">
-                            <div class="text-6xl ml-4">🪢</div>
-                            <h1 class="text-5xl font-bold text-white">JumpFitPro</h1>
+                        <div class="flex items-center justify-center mb-8">
+                            <img src="/static/logo.svg" alt="JumpFitPro" class="h-20" />
                         </div>
-                        <div class="text-8xl my-6">🏃‍♂️💨</div>
                         <p class="text-lg mb-8">המסע שלך לירידה במשקל מתחיל כאן!</p>
                         <div class="space-y-3 text-right">
                             <div class="flex items-center gap-3">
@@ -2278,8 +2278,7 @@ app.get('/create-profile', (c) => {
             <!-- Logo and Header -->
             <div class="text-center mb-8">
                 <div class="flex items-center justify-center mb-4">
-                    <div class="text-5xl ml-3">🪢</div>
-                    <h1 class="text-4xl font-bold text-gray-800">JumpFitPro</h1>
+                    <img src="/static/logo.svg" alt="JumpFitPro" class="h-16" />
                 </div>
                 <h2 class="text-2xl font-bold text-indigo-600 mb-2">יצירת פרופיל חדש</h2>
                 <p class="text-gray-600">התחל את המסע שלך לירידה במשקל! 💪</p>
@@ -3146,7 +3145,9 @@ app.get('/dashboard', (c) => {
             <div class="max-w-7xl mx-auto px-4 py-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                        <div class="flex items-center gap-2">
+                            <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                        </div>
                         <div class="flex items-center gap-3">
                             <img id="userProfileImage" src="" alt="Profile" class="h-10 w-10 rounded-full object-cover border-2 border-indigo-500 hidden" />
                             <div>
@@ -3973,7 +3974,9 @@ app.get('/plans', (c) => {
         <header class="bg-white shadow-md">
             <div class="max-w-7xl mx-auto px-4 py-4">
                 <div class="flex items-center justify-between">
-                    <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                    <div class="flex items-center gap-2">
+                        <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                    </div>
                     <a href="/dashboard?user=${userId}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">
                         <i class="fas fa-arrow-right ml-2"></i>
                         חזרה לדשבורד
@@ -4769,7 +4772,9 @@ app.get('/workout/:id', async (c) => {
         <header class="bg-white shadow-md">
             <div class="max-w-7xl mx-auto px-4 py-4">
                 <div class="flex items-center justify-between">
-                    <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                    <div class="flex items-center gap-2">
+                        <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                    </div>
                     <a href="/dashboard?user=${userId}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">
                         <i class="fas fa-arrow-right ml-2"></i>
                         חזרה לדשבורד
@@ -5151,7 +5156,9 @@ app.get('/live-workout', (c) => {
         <header class="bg-white shadow-md">
             <div class="max-w-7xl mx-auto px-4 py-4">
                 <div class="flex items-center justify-between">
-                    <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                    <div class="flex items-center gap-2">
+                        <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                    </div>
                     <a href="/dashboard?user=${userId}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg text-sm sm:text-base">
                         <i class="fas fa-arrow-right ml-2"></i>
                         חזרה
@@ -5505,7 +5512,9 @@ app.get('/settings', (c) => {
         <header class="bg-white shadow-md">
             <div class="max-w-7xl mx-auto px-4 py-4">
                 <div class="flex items-center justify-between">
-                    <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                    <div class="flex items-center gap-2">
+                        <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                    </div>
                     <a href="/dashboard?user=${userId}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">
                         <i class="fas fa-arrow-right ml-2"></i>
                         חזרה לדשבורד
