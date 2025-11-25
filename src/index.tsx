@@ -3706,7 +3706,7 @@ app.get('/settings', (c) => {
             // Delete user (permanent)
             async function deleteUserPermanent() {
                 const userConfirmed = await new Promise(resolve => {
-                    showConfirmDialog('⚠️ אזהרה! מחיקה זו לא ניתנת לשחזור.\n\nהאם אתה בטוח לחלוטין שברצונך למחוק את המשתמש וכל הנתונים שלו לצמיתות?', () => resolve(true), () => resolve(false));
+                    showConfirmDialog('⚠️ אזהרה! מחיקה זו לא ניתנת לשחזור.\\n\\nהאם אתה בטוח לחלוטין שברצונך למחוק את המשתמש וכל הנתונים שלו לצמיתות?', () => resolve(true), () => resolve(false));
                 });
                 if (!userConfirmed) return;
 
