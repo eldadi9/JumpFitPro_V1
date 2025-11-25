@@ -2016,16 +2016,19 @@ app.get('/admin', (c) => {
                             <button onclick="viewUserDetails(\${user.id})" class="inline-block bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-xs">
                                 <i class="fas fa-info-circle"></i> פרטים מלאים
                             </button>
-                            <a href="/dashboard?user=\${user.id}" target="_blank" class="inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-xs">
+                            <button onclick="loginAsUser(\${user.id}, '\${user.name}')" class="inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold">
+                                <i class="fas fa-sign-in-alt"></i> היכנס כמשתמש
+                            </button>
+                            <a href="/dashboard?user=\${user.id}" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
                                 <i class="fas fa-chart-line"></i> דשבורד
                             </a>
-                            <a href="/plans?user=\${user.id}" target="_blank" class="inline-block bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
+                            <a href="/plans?user=\${user.id}" class="inline-block bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">
                                 <i class="fas fa-dumbbell"></i> תכניות
                             </a>
-                            <a href="/live-workout?user=\${user.id}" target="_blank" class="inline-block bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs">
+                            <a href="/live-workout?user=\${user.id}" class="inline-block bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs">
                                 <i class="fas fa-play-circle"></i> אימון
                             </a>
-                            <a href="/settings?user=\${user.id}" target="_blank" class="inline-block bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
+                            <a href="/settings?user=\${user.id}" class="inline-block bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs">
                                 <i class="fas fa-cog"></i> הגדרות
                             </a>
                         </td>
@@ -2036,6 +2039,22 @@ app.get('/admin', (c) => {
             function handleLogout() {
                 localStorage.clear()
                 window.location.href = '/'
+            }
+
+            // Login as user (Impersonate)
+            function loginAsUser(userId, userName) {
+                // Save admin info for return
+                localStorage.setItem('admin_user_id', localStorage.getItem('user_id'))
+                localStorage.setItem('admin_session_token', sessionToken)
+                localStorage.setItem('admin_user_name', localStorage.getItem('user_name'))
+                
+                // Set user info
+                localStorage.setItem('user_id', userId)
+                localStorage.setItem('user_name', userName)
+                localStorage.setItem('impersonating', 'true')
+                
+                // Redirect to dashboard
+                window.location.href = '/dashboard?user=' + userId
             }
 
             // View user full details
@@ -2457,31 +2476,44 @@ app.get('/create-profile', (c) => {
                 }
 
                 console.log('Sending profile data:', formData)
+                showMessage('שומר פרטים...', 'info')
 
                 try {
                     const response = await axios.post('/api/auth/complete-profile', formData)
                     console.log('Profile response:', response.data)
                     
-                    if (response.data.success) {
-                        showMessage('הפרופיל נוצר בהצלחה! מעביר לדשבורד...', 'success')
+                    if (response.data && response.data.success) {
+                        showMessage('✅ הפרופיל נוצר בהצלחה! מעביר לדשבורד...', 'success')
                         localStorage.setItem('user_name', formData.name)
                         
                         setTimeout(() => {
+                            console.log('Redirecting to dashboard...')
                             window.location.href = '/dashboard?user=' + userId
                         }, 1500)
                     } else {
-                        showMessage(response.data.error || 'שגיאה ביצירת פרופיל', 'error')
+                        const errMsg = response.data?.error || 'שגיאה ביצירת פרופיל'
+                        console.error('Profile creation failed:', errMsg)
+                        showMessage('❌ ' + errMsg, 'error')
                     }
                 } catch (error) {
                     console.error('Profile creation error:', error)
-                    showMessage(error.response?.data?.error || error.message || 'שגיאה בשרת', 'error')
+                    const errMsg = error.response?.data?.error || error.message || 'שגיאה בחיבור לשרת'
+                    showMessage('❌ ' + errMsg, 'error')
                 }
             })
 
             function showMessage(text, type) {
                 const msg = document.getElementById('message')
                 msg.textContent = text
-                msg.className = 'mt-4 p-4 rounded-lg ' + (type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800')
+                let className = 'mt-4 p-4 rounded-lg '
+                if (type === 'success') {
+                    className += 'bg-green-100 text-green-800 border border-green-300'
+                } else if (type === 'info') {
+                    className += 'bg-blue-100 text-blue-800 border border-blue-300'
+                } else {
+                    className += 'bg-red-100 text-red-800 border border-red-300'
+                }
+                msg.className = className
                 msg.classList.remove('hidden')
             }
 
@@ -3162,6 +3194,10 @@ app.get('/dashboard', (c) => {
                         </div>
                     </div>
                     <div class="flex gap-2">
+                        <button id="returnToAdminBtn" onclick="returnToAdmin()" class="hidden bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg">
+                            <i class="fas fa-arrow-right ml-2"></i>
+                            חזור לאדמין
+                        </button>
                         <a href="/admin" id="adminPanelBtn" class="hidden bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
                             <i class="fas fa-shield-alt ml-2"></i>
                             Admin Panel
@@ -3487,7 +3523,13 @@ app.get('/dashboard', (c) => {
               
               // הצגת כפתור Admin Panel למנהלים בלבד
               const userRole = localStorage.getItem('user_role')
-              if (userRole === 'admin') {
+              const isImpersonating = localStorage.getItem('impersonating') === 'true'
+              
+              if (isImpersonating) {
+                // Admin is viewing as user - show return button
+                document.getElementById('returnToAdminBtn').classList.remove('hidden')
+              } else if (userRole === 'admin') {
+                // Regular admin - show admin panel button
                 document.getElementById('adminPanelBtn').classList.remove('hidden')
               }
               
@@ -3942,6 +3984,27 @@ app.get('/dashboard', (c) => {
             const calories = Math.round((met * weight * duration) / 60)
             
             document.getElementById('calorieResult').textContent = calories
+          }
+
+          // Return to admin panel
+          function returnToAdmin() {
+            // Restore admin credentials
+            const adminUserId = localStorage.getItem('admin_user_id')
+            const adminSessionToken = localStorage.getItem('admin_session_token')
+            const adminUserName = localStorage.getItem('admin_user_name')
+            
+            localStorage.setItem('user_id', adminUserId)
+            localStorage.setItem('session_token', adminSessionToken)
+            localStorage.setItem('user_name', adminUserName)
+            
+            // Clear impersonation flags
+            localStorage.removeItem('impersonating')
+            localStorage.removeItem('admin_user_id')
+            localStorage.removeItem('admin_session_token')
+            localStorage.removeItem('admin_user_name')
+            
+            // Redirect to admin panel
+            window.location.href = '/admin'
           }
 
           // Load dashboard on page load
