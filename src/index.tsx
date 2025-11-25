@@ -1102,6 +1102,139 @@ app.patch('/api/admin/users/:id', async (c) => {
 })
 
 /**
+ * Admin Panel - קבלת כל הנתונים המפורטים של משתמש (Admin בלבד)
+ */
+app.get('/api/admin/users/:id/details', async (c) => {
+  try {
+    const sessionToken = c.req.header('Authorization')?.replace('Bearer ', '')
+    
+    if (!sessionToken) {
+      return c.json({ error: 'נדרשת הרשאת Admin' }, 401)
+    }
+    
+    // Verify admin session
+    const session = await c.env.DB.prepare(`
+      SELECT s.user_id, u.role 
+      FROM user_sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.session_token = ? AND s.expires_at > datetime('now')
+    `).bind(sessionToken).first()
+    
+    if (!session || session.role !== 'admin') {
+      return c.json({ error: 'נדרשת הרשאת Admin' }, 403)
+    }
+    
+    const userId = c.req.param('id')
+    
+    // Get user basic info
+    const user = await c.env.DB.prepare(`
+      SELECT 
+        id, name, email, phone, age, height_cm, weight_kg, target_weight_kg,
+        gender, current_level, preferred_intensity, workouts_per_week,
+        role, is_active, is_deleted, profile_image,
+        created_at, last_login, updated_at
+      FROM users 
+      WHERE id = ?
+    `).bind(userId).first()
+    
+    if (!user) {
+      return c.json({ error: 'משתמש לא נמצא' }, 404)
+    }
+    
+    // Get workout stats
+    const workoutStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_workouts,
+        SUM(calories_burned) as total_calories,
+        SUM(work_minutes) as total_work_minutes,
+        MAX(created_at) as last_workout_date
+      FROM workout_logs
+      WHERE user_id = ?
+    `).bind(userId).first()
+    
+    // Get recent workouts (last 10)
+    const recentWorkouts = await c.env.DB.prepare(`
+      SELECT 
+        id, work_minutes, calories_burned, intensity,
+        notes, created_at
+      FROM workout_logs
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 10
+    `).bind(userId).all()
+    
+    // Get weight tracking history
+    const weightHistory = await c.env.DB.prepare(`
+      SELECT 
+        weight_kg, measurement_date, notes
+      FROM weight_tracking
+      WHERE user_id = ?
+      ORDER BY measurement_date DESC
+      LIMIT 20
+    `).bind(userId).all()
+    
+    // Get achievements
+    const achievements = await c.env.DB.prepare(`
+      SELECT 
+        achievement_type, achievement_name, achievement_value, earned_date
+      FROM achievements
+      WHERE user_id = ?
+      ORDER BY earned_date DESC
+    `).bind(userId).all()
+    
+    // Calculate BMI
+    const bmi = user.height_cm ? (user.weight_kg / Math.pow(user.height_cm / 100, 2)).toFixed(1) : null
+    
+    // Calculate progress
+    const startWeight = weightHistory.results.length > 0 
+      ? weightHistory.results[weightHistory.results.length - 1].weight_kg 
+      : user.weight_kg
+    const currentWeight = user.weight_kg
+    const targetWeight = user.target_weight_kg
+    const totalToLose = startWeight - targetWeight
+    const lost = startWeight - currentWeight
+    const remaining = currentWeight - targetWeight
+    const progressPercent = totalToLose > 0 ? ((lost / totalToLose) * 100).toFixed(1) : 0
+    
+    return c.json({ 
+      success: true,
+      user: {
+        ...user,
+        bmi: bmi,
+        bmi_status: bmi ? (bmi < 18.5 ? 'תת משקל' : bmi < 25 ? 'תקין' : bmi < 30 ? 'עודף משקל' : 'השמנה') : null
+      },
+      stats: {
+        workouts: {
+          total: workoutStats.total_workouts || 0,
+          total_calories: workoutStats.total_calories || 0,
+          total_hours: workoutStats.total_work_minutes ? (workoutStats.total_work_minutes / 60).toFixed(1) : 0,
+          last_workout: workoutStats.last_workout_date || null
+        },
+        weight: {
+          start_weight: startWeight,
+          current_weight: currentWeight,
+          target_weight: targetWeight,
+          weight_lost: lost,
+          weight_remaining: remaining,
+          progress_percent: progressPercent,
+          measurements_count: weightHistory.results.length
+        },
+        achievements: {
+          total: achievements.results.length,
+          list: achievements.results
+        }
+      },
+      recent_data: {
+        workouts: recentWorkouts.results,
+        weight_history: weightHistory.results
+      }
+    })
+  } catch (error) {
+    return c.json({ error: 'שגיאה בקבלת נתוני משתמש', details: String(error) }, 500)
+  }
+})
+
+/**
  * בדיקת session והחזרת פרטי משתמש
  */
 app.get('/api/auth/me', async (c) => {
@@ -1626,6 +1759,29 @@ app.get('/admin', (c) => {
                 </div>
             </div>
 
+            <!-- User Details Modal -->
+            <div id="userDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+                    <div class="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-2xl">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold">
+                                <i class="fas fa-user-circle ml-2"></i>
+                                פרטי משתמש מלאים
+                            </h2>
+                            <button onclick="closeUserDetailsModal()" class="text-white hover:text-gray-200 text-2xl">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="userDetailsContent" class="p-6">
+                        <div class="text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-4xl text-indigo-600"></i>
+                            <p class="mt-4 text-gray-600">טוען נתונים...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Users Table -->
             <div class="bg-white rounded-lg shadow-md overflow-hidden">
                 <div class="p-6 border-b border-gray-200">
@@ -1724,6 +1880,9 @@ app.get('/admin', (c) => {
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">\${new Date(user.created_at).toLocaleDateString('he-IL')}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                            <button onclick="viewUserDetails(\${user.id})" class="inline-block bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-xs">
+                                <i class="fas fa-info-circle"></i> פרטים מלאים
+                            </button>
                             <a href="/dashboard?user=\${user.id}" target="_blank" class="inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-xs">
                                 <i class="fas fa-chart-line"></i> דשבורד
                             </a>
@@ -1744,6 +1903,194 @@ app.get('/admin', (c) => {
             function handleLogout() {
                 localStorage.clear()
                 window.location.href = '/'
+            }
+
+            // View user full details
+            async function viewUserDetails(userId) {
+                document.getElementById('userDetailsModal').classList.remove('hidden')
+                document.getElementById('userDetailsContent').innerHTML = \`
+                    <div class="text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl text-indigo-600"></i>
+                        <p class="mt-4 text-gray-600">טוען נתונים...</p>
+                    </div>
+                \`
+
+                try {
+                    const response = await axios.get(\`/api/admin/users/\${userId}/details\`, {
+                        headers: { 'Authorization': 'Bearer ' + sessionToken }
+                    })
+
+                    const data = response.data
+                    const user = data.user
+                    const stats = data.stats
+                    const recent = data.recent_data
+
+                    document.getElementById('userDetailsContent').innerHTML = \`
+                        <!-- User Basic Info -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                            <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-md">
+                                <h3 class="text-lg font-bold mb-4"><i class="fas fa-user ml-2"></i>פרטים אישיים</h3>
+                                <div class="space-y-2 text-sm">
+                                    <p><strong>שם:</strong> \${user.name}</p>
+                                    <p><strong>מייל:</strong> \${user.email || '-'}</p>
+                                    <p><strong>טלפון:</strong> \${user.phone || '-'}</p>
+                                    <p><strong>גיל:</strong> \${user.age || '-'}</p>
+                                    <p><strong>מין:</strong> \${user.gender === 'male' ? 'זכר' : 'נקבה'}</p>
+                                    <p><strong>גובה:</strong> \${user.height_cm} ס"מ</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow-md">
+                                <h3 class="text-lg font-bold mb-4"><i class="fas fa-weight ml-2"></i>מידע משקל</h3>
+                                <div class="space-y-2 text-sm">
+                                    <p><strong>משקל נוכחי:</strong> \${user.weight_kg} ק"ג</p>
+                                    <p><strong>משקל יעד:</strong> \${user.target_weight_kg} ק"ג</p>
+                                    <p><strong>BMI:</strong> \${user.bmi} (\${user.bmi_status})</p>
+                                    <p><strong>ירד במשקל:</strong> \${stats.weight.weight_lost.toFixed(1)} ק"ג</p>
+                                    <p><strong>נותר לרדת:</strong> \${stats.weight.weight_remaining.toFixed(1)} ק"ג</p>
+                                    <p><strong>התקדמות:</strong> \${stats.weight.progress_percent}%</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow-md">
+                                <h3 class="text-lg font-bold mb-4"><i class="fas fa-dumbbell ml-2"></i>פרופיל אימון</h3>
+                                <div class="space-y-2 text-sm">
+                                    <p><strong>רמה:</strong> \${user.current_level}</p>
+                                    <p><strong>עוצמה מועדפת:</strong> \${user.preferred_intensity}</p>
+                                    <p><strong>אימונים בשבוע:</strong> \${user.workouts_per_week}</p>
+                                    <p><strong>תפקיד:</strong> \${user.role === 'admin' ? '👑 מנהל' : '👤 משתמש'}</p>
+                                    <p><strong>סטטוס:</strong> \${user.is_active ? '✅ פעיל' : '⏸️ לא פעיל'}</p>
+                                    <p><strong>הצטרף:</strong> \${new Date(user.created_at).toLocaleDateString('he-IL')}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Workout Stats -->
+                        <div class="bg-white border-2 border-gray-200 rounded-lg p-6 mb-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                                <i class="fas fa-chart-bar text-indigo-600 ml-2"></i>
+                                סטטיסטיקות אימונים
+                            </h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="text-center p-4 bg-indigo-50 rounded-lg">
+                                    <i class="fas fa-running text-3xl text-indigo-600 mb-2"></i>
+                                    <p class="text-2xl font-bold text-gray-800">\${stats.workouts.total}</p>
+                                    <p class="text-sm text-gray-600">סך אימונים</p>
+                                </div>
+                                <div class="text-center p-4 bg-green-50 rounded-lg">
+                                    <i class="fas fa-fire text-3xl text-green-600 mb-2"></i>
+                                    <p class="text-2xl font-bold text-gray-800">\${stats.workouts.total_calories.toLocaleString()}</p>
+                                    <p class="text-sm text-gray-600">קלוריות נשרפו</p>
+                                </div>
+                                <div class="text-center p-4 bg-orange-50 rounded-lg">
+                                    <i class="fas fa-clock text-3xl text-orange-600 mb-2"></i>
+                                    <p class="text-2xl font-bold text-gray-800">\${stats.workouts.total_hours}</p>
+                                    <p class="text-sm text-gray-600">שעות אימון</p>
+                                </div>
+                                <div class="text-center p-4 bg-purple-50 rounded-lg">
+                                    <i class="fas fa-trophy text-3xl text-purple-600 mb-2"></i>
+                                    <p class="text-2xl font-bold text-gray-800">\${stats.achievements.total}</p>
+                                    <p class="text-sm text-gray-600">הישגים</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Workouts -->
+                        <div class="bg-white border-2 border-gray-200 rounded-lg p-6 mb-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                                <i class="fas fa-history text-indigo-600 ml-2"></i>
+                                אימונים אחרונים (10 אחרונים)
+                            </h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-right">תאריך</th>
+                                            <th class="px-4 py-2 text-right">משך (דקות)</th>
+                                            <th class="px-4 py-2 text-right">קלוריות</th>
+                                            <th class="px-4 py-2 text-right">עוצמה</th>
+                                            <th class="px-4 py-2 text-right">הערות</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        \${recent.workouts.length > 0 ? recent.workouts.map(w => \`
+                                            <tr>
+                                                <td class="px-4 py-2">\${new Date(w.created_at).toLocaleDateString('he-IL')}</td>
+                                                <td class="px-4 py-2">\${w.work_minutes ? w.work_minutes.toFixed(1) : '-'}</td>
+                                                <td class="px-4 py-2">\${w.calories_burned}</td>
+                                                <td class="px-4 py-2">
+                                                    <span class="px-2 py-1 text-xs rounded-full \${w.intensity === 'high' ? 'bg-red-100 text-red-800' : w.intensity === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">
+                                                        \${w.intensity}
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-2">\${w.notes || '-'}</td>
+                                            </tr>
+                                        \`).join('') : '<tr><td colspan="5" class="text-center py-4 text-gray-500">אין אימונים</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Weight History -->
+                        <div class="bg-white border-2 border-gray-200 rounded-lg p-6 mb-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                                <i class="fas fa-chart-line text-indigo-600 ml-2"></i>
+                                היסטוריית משקל (20 אחרונים)
+                            </h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-right">תאריך</th>
+                                            <th class="px-4 py-2 text-right">משקל (ק"ג)</th>
+                                            <th class="px-4 py-2 text-right">הערות</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        \${recent.weight_history.length > 0 ? recent.weight_history.map(w => \`
+                                            <tr>
+                                                <td class="px-4 py-2">\${new Date(w.measurement_date).toLocaleDateString('he-IL')}</td>
+                                                <td class="px-4 py-2 font-bold">\${w.weight_kg}</td>
+                                                <td class="px-4 py-2">\${w.notes || '-'}</td>
+                                            </tr>
+                                        \`).join('') : '<tr><td colspan="3" class="text-center py-4 text-gray-500">אין מדידות משקל</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Achievements -->
+                        <div class="bg-white border-2 border-gray-200 rounded-lg p-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                                <i class="fas fa-trophy text-yellow-500 ml-2"></i>
+                                הישגים (\${stats.achievements.total})
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                \${stats.achievements.total > 0 ? stats.achievements.list.map(a => \`
+                                    <div class="bg-gradient-to-br from-yellow-100 to-orange-100 p-4 rounded-lg border-2 border-yellow-300">
+                                        <div class="text-center">
+                                            <div class="text-3xl mb-2">🏆</div>
+                                            <h4 class="font-bold text-gray-800">\${a.achievement_name}</h4>
+                                            <p class="text-sm text-gray-600">\${a.achievement_type}</p>
+                                            <p class="text-xs text-gray-500 mt-2">\${new Date(a.earned_date).toLocaleDateString('he-IL')}</p>
+                                        </div>
+                                    </div>
+                                \`).join('') : '<p class="text-center text-gray-500">אין הישגים עדיין</p>'}
+                            </div>
+                        </div>
+                    \`
+                } catch (error) {
+                    document.getElementById('userDetailsContent').innerHTML = \`
+                        <div class="text-center py-8">
+                            <i class="fas fa-exclamation-circle text-4xl text-red-600"></i>
+                            <p class="mt-4 text-gray-600">שגיאה בטעינת נתונים: \${error.response?.data?.error || error.message}</p>
+                        </div>
+                    \`
+                }
+            }
+
+            function closeUserDetailsModal() {
+                document.getElementById('userDetailsModal').classList.add('hidden')
             }
 
             // Load on page load
