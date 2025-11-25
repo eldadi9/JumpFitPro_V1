@@ -2375,7 +2375,7 @@ app.get('/workout-timer', async (c) => {
                 
                 if (userId) {
                     const userResponse = await axios.get(\`/api/users/\${userId}\`);
-                    timerState.userWeight = userResponse.data.user.weight_kg;
+                    timerState.userWeight = userResponse.data.weight_kg;
                 }
                 
                 updateSetCounter();
@@ -3594,7 +3594,7 @@ app.get('/settings', (c) => {
             // Load current profile image
             async function loadProfileImage() {
                 try {
-                    const response = await axios.get(\`/api/users/\${userId}\`)
+                    const response = await axios.get('/api/users/' + userId)
                     // הנתונים מגיעים ישירות (לא מקוננים ב-user)
                     if (response.data.profile_image && response.data.profile_image !== 'null') {
                         document.getElementById('currentProfileImage').src = response.data.profile_image
@@ -3659,7 +3659,7 @@ app.get('/settings', (c) => {
             // Upload profile image
             async function uploadProfileImage(base64Image) {
                 try {
-                    const response = await axios.patch(\`/api/users/\${userId}/profile-image\`, {
+                    const response = await axios.patch('/api/users/' + userId + '/profile-image', {
                         profile_image: base64Image
                     })
                     showNotification('תמונת הפרופיל עודכנה בהצלחה', 'success')
@@ -3677,7 +3677,7 @@ app.get('/settings', (c) => {
                 if (!userConfirmed) return;
 
                 try {
-                    await axios.patch(\`/api/users/\${userId}/profile-image\`, {
+                    await axios.patch('/api/users/' + userId + '/profile-image', {
                         profile_image: null
                     })
                     showNotification('תמונת הפרופיל נמחקה בהצלחה', 'success')
@@ -3695,7 +3695,7 @@ app.get('/settings', (c) => {
                 if (!userConfirmed) return;
 
                 try {
-                    await axios.delete(\`/api/users/\${userId}\`)
+                    await axios.delete('/api/users/' + userId)
                     showNotification('המשתמש נמחק בהצלחה', 'success')
                     window.location.href = '/'
                 } catch (error) {
@@ -3711,7 +3711,7 @@ app.get('/settings', (c) => {
                 if (!userConfirmed) return;
 
                 try {
-                    await axios.delete(\`/api/users/\${userId}/permanent\`)
+                    await axios.delete('/api/users/' + userId + '/permanent')
                     showNotification('המשתמש נמחק לצמיתות', 'success')
                     window.location.href = '/'
                 } catch (error) {
