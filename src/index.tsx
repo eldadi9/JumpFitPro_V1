@@ -1964,6 +1964,7 @@ app.get('/plans', (c) => {
                     
                     document.getElementById('plansContainer').innerHTML = plansHtml
                 } catch (error) {
+                    console.error('Error loading plans:', error)
                     showNotification('שגיאה בטעינת תכניות: ' + error.message, 'error')
                 }
             }
