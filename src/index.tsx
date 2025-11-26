@@ -1954,30 +1954,48 @@ app.get('/admin', (c) => {
         </div>
 
         <script>
+            console.log('=== Admin Panel Script Started ===')
             let sessionToken = localStorage.getItem('session_token')
             let userId = localStorage.getItem('user_id')
             let userName = localStorage.getItem('user_name')
             let userRole = localStorage.getItem('user_role')
 
+            console.log('localStorage check:')
+            console.log('- sessionToken:', sessionToken ? 'EXISTS' : 'MISSING')
+            console.log('- userId:', userId)
+            console.log('- userName:', userName)
+            console.log('- userRole:', userRole)
+
             // Check authentication
             if (!sessionToken || userRole !== 'admin') {
+                console.error('Authentication failed!')
+                console.error('- sessionToken exists:', !!sessionToken)
+                console.error('- userRole is admin:', userRole === 'admin')
                 alert('נדרשת הרשאת Admin!')
                 window.location.href = '/'
             }
 
+            console.log('Authentication passed!')
             document.getElementById('adminName').textContent = userName || 'Admin'
 
             // Load users
             async function loadUsers() {
+                console.log('=== loadUsers() called ===')
+                console.log('sessionToken:', sessionToken)
+                console.log('userRole:', userRole)
+                
                 try {
+                    console.log('Making API call to /api/admin/users...')
                     const response = await axios.get('/api/admin/users', {
                         headers: { 'Authorization': 'Bearer ' + sessionToken }
                     })
 
+                    console.log('Users loaded:', response.data.users.length)
                     const users = response.data.users
                     updateStats(users)
                     renderUsersTable(users)
                 } catch (error) {
+                    console.error('Error loading users:', error)
                     alert('שגיאה בטעינת משתמשים: ' + (error.response?.data?.error || error.message))
                     if (error.response?.status === 401 || error.response?.status === 403) {
                         window.location.href = '/'
