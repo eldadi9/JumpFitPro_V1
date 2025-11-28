@@ -871,6 +871,92 @@ app.get('/api/intensity-levels', async (c) => {
 })
 
 // ========================================
+// API Routes - תזונה (Nutrition)
+// ========================================
+
+/**
+ * Chat with Nutrition GPT
+ * This endpoint will connect to your custom GPT
+ */
+app.post('/api/nutrition/chat', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { message, userId, history } = body
+
+    if (!message) {
+      return c.json({ error: 'הודעה ריקה' }, 400)
+    }
+
+    // TODO: Get OpenAI API key from environment variables
+    // For now, return a placeholder response
+    // You need to add OPENAI_API_KEY to your wrangler.jsonc secrets
+    
+    const OPENAI_API_KEY = c.env.OPENAI_API_KEY || ''
+    
+    if (!OPENAI_API_KEY) {
+      return c.json({ 
+        response: '⚠️ מערכת התזונה עדיין בהקמה. בינתיים, אתה יכול לשאול שאלות ואני אענה עליהן ברגע שה-API Key יוגדר.\\n\\nכדי להפעיל את המערכת:\\n1. קבל OpenAI API Key\\n2. הוסף אותו ל-wrangler secrets\\n3. חבר את ה-GPT ID שלך'
+      })
+    }
+
+    // Get user data for context
+    const user = await c.env.DB.prepare(`
+      SELECT name, age, gender, weight_kg, target_weight_kg, height_cm, current_level
+      FROM users WHERE id = ?
+    `).bind(userId).first()
+
+    // Build context for GPT
+    const userGender = user?.gender === 'male' ? 'זכר' : 'נקבה'
+    const systemMessage = `אתה מומחה תזונה ישראלי. המשתמש שלך הוא ${user?.name || 'משתמש'}:
+- גיל: ${user?.age || 'לא ידוע'}
+- מין: ${userGender}
+- משקל נוכחי: ${user?.weight_kg || 'לא ידוע'} ק"ג
+- משקל יעד: ${user?.target_weight_kg || 'לא ידוע'} ק"ג
+- רמת כושר: ${user?.current_level || 'לא ידוע'}
+
+תן המלצות מותאמות אישית, מתכונים בעברית, וחשב קלוריות כשצריך.
+השתמש בשפה חמימה וידידותית.`
+
+    // Call OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4', // or your GPT model
+        messages: [
+          { role: 'system', content: systemMessage },
+          ...(history || []),
+          { role: 'user', content: message }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    const gptResponse = data.choices[0]?.message?.content || 'לא הצלחתי לקבל תשובה'
+
+    return c.json({ 
+      success: true,
+      response: gptResponse
+    })
+  } catch (error) {
+    console.error('Nutrition chat error:', error)
+    const errorMsg = String(error)
+    return c.json({ 
+      response: `מצטער, אירעה שגיאה בהתקשרות למערכת התזונה. \n\nהשגיאה: ${errorMsg}\n\nאנא נסה שוב מאוחר יותר.`
+    })
+  }
+})
+
+// ========================================
 // API Routes - אימות (Authentication)
 // ========================================
 
@@ -3453,6 +3539,10 @@ app.get('/dashboard', (c) => {
                     <button onclick="window.location.href='/plans?user=${userId}'" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 sm:py-5 rounded-lg transition duration-300 text-base sm:text-lg">
                         <i class="fas fa-list ml-2"></i>
                         תכניות
+                    </button>
+                    <button onclick="window.location.href='/nutrition?user=${userId}'" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-4 sm:py-5 rounded-lg transition duration-300 text-base sm:text-lg">
+                        <i class="fas fa-utensils ml-2"></i>
+                        תזונה
                     </button>
                     <button onclick="window.location.href='/settings?user=${userId}'" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-4 sm:py-5 rounded-lg transition duration-300 text-base sm:text-lg">
                         <i class="fas fa-cog ml-2"></i>
@@ -6090,6 +6180,302 @@ app.get('/settings', (c) => {
             })
 
             loadProfileImage()
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+/**
+ * Nutrition Page - דף תזונה ומתכונים
+ */
+app.get('/nutrition', (c) => {
+  const userId = c.req.query('user')
+  
+  if (!userId) {
+    return c.redirect('/')
+  }
+
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="he" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>תזונה ומתכונים - JumpFitPro</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    </head>
+    <body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-lg sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <img src="/static/logo.svg" alt="JumpFitPro" class="h-12" />
+                        <h1 class="text-2xl font-bold text-gray-800">
+                            <i class="fas fa-utensils text-green-600 ml-2"></i>
+                            תזונה ומתכונים
+                        </h1>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="returnToAdminBtn" onclick="returnToAdmin()" class="hidden bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg">
+                            <i class="fas fa-arrow-right ml-2"></i>
+                            חזור לאדמין
+                        </button>
+                        <a href="/admin" id="adminPanelBtn" class="hidden bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
+                            <i class="fas fa-shield-alt ml-2"></i>
+                            Admin Panel
+                        </a>
+                        <a href="/dashboard?user=${userId}" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
+                            <i class="fas fa-arrow-right ml-2"></i>
+                            חזרה לדשבורד
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 py-8">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fas fa-fire text-3xl text-orange-500"></i>
+                        <span class="text-gray-500 text-sm">יעד יומי</span>
+                    </div>
+                    <h3 class="text-3xl font-bold text-gray-800" id="dailyCalorieGoal">0</h3>
+                    <p class="text-gray-600 text-sm">קלוריות ליום</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fas fa-apple-alt text-3xl text-green-500"></i>
+                        <span class="text-gray-500 text-sm">היום</span>
+                    </div>
+                    <h3 class="text-3xl font-bold text-gray-800" id="todayCalories">0</h3>
+                    <p class="text-gray-600 text-sm">קלוריות נצרכו</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fas fa-balance-scale text-3xl text-blue-500"></i>
+                        <span class="text-gray-500 text-sm">יתרה</span>
+                    </div>
+                    <h3 class="text-3xl font-bold" id="calorieBalance">0</h3>
+                    <p class="text-gray-600 text-sm">קלוריות נותרו</p>
+                </div>
+            </div>
+
+            <!-- Chat with Nutrition GPT -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-comments text-green-600 ml-2"></i>
+                    שאל את המומחה לתזונה
+                </h2>
+                <p class="text-gray-600 mb-4">שאל שאלות על תזונה, קבל המלצות למתכונים, וקבל תכנית תזונה מותאמת אישית</p>
+                
+                <!-- Chat Messages -->
+                <div id="chatMessages" class="border-2 border-gray-200 rounded-lg p-4 mb-4 h-96 overflow-y-auto bg-gray-50">
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-robot text-4xl mb-4"></i>
+                        <p>התחל שיחה עם המומחה לתזונה שלנו</p>
+                        <p class="text-sm mt-2">שאל שאלות כמו: "תן לי מתכון בריא לארוחת בוקר" או "כמה קלוריות יש בבננה?"</p>
+                    </div>
+                </div>
+                
+                <!-- Chat Input -->
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="chatInput" 
+                        placeholder="כתוב את השאלה שלך כאן..." 
+                        class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500"
+                        onkeypress="if(event.key === 'Enter') sendMessage()"
+                    />
+                    <button 
+                        onclick="sendMessage()" 
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-lg transition">
+                        <i class="fas fa-paper-plane ml-2"></i>
+                        שלח
+                    </button>
+                </div>
+                
+                <div id="loadingIndicator" class="hidden mt-4 text-center">
+                    <i class="fas fa-spinner fa-spin text-2xl text-green-600"></i>
+                    <p class="text-gray-600 mt-2">המומחה חושב...</p>
+                </div>
+            </div>
+
+            <!-- Quick Recipe Suggestions -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-lightbulb text-yellow-500 ml-2"></i>
+                    הצעות מהירות
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <button onclick="quickQuestion('תן לי מתכון בריא לארוחת בוקר')" 
+                        class="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-4 px-6 rounded-lg transition">
+                        <i class="fas fa-sun ml-2"></i>
+                        ארוחת בוקר
+                    </button>
+                    <button onclick="quickQuestion('תן לי מתכון בריא לארוחת צהריים')" 
+                        class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-4 px-6 rounded-lg transition">
+                        <i class="fas fa-utensils ml-2"></i>
+                        ארוחת צהריים
+                    </button>
+                    <button onclick="quickQuestion('תן לי מתכון בריא לארוחת ערב')" 
+                        class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 px-6 rounded-lg transition">
+                        <i class="fas fa-moon ml-2"></i>
+                        ארוחת ערב
+                    </button>
+                    <button onclick="quickQuestion('תן לי רעיונות לחטיפים בריאים')" 
+                        class="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-4 px-6 rounded-lg transition">
+                        <i class="fas fa-cookie ml-2"></i>
+                        חטיפים
+                    </button>
+                    <button onclick="quickQuestion('כמה קלוריות צריך לאכול ביום?')" 
+                        class="bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white font-bold py-4 px-6 rounded-lg transition">
+                        <i class="fas fa-calculator ml-2"></i>
+                        חישוב קלוריות
+                    </button>
+                    <button onclick="quickQuestion('תן לי תכנית תזונה שבועית')" 
+                        class="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold py-4 px-6 rounded-lg transition">
+                        <i class="fas fa-calendar-week ml-2"></i>
+                        תכנית שבועית
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <script>
+            const userId = ${userId};
+            let conversationHistory = [];
+
+            // Check if user is impersonating
+            const isImpersonating = localStorage.getItem('impersonating') === 'true';
+            const userRole = localStorage.getItem('user_role');
+
+            if (isImpersonating) {
+                document.getElementById('returnToAdminBtn').classList.remove('hidden');
+            } else if (userRole === 'admin') {
+                document.getElementById('adminPanelBtn').classList.remove('hidden');
+            }
+
+            function returnToAdmin() {
+                const adminUserId = localStorage.getItem('admin_user_id');
+                const adminSessionToken = localStorage.getItem('admin_session_token');
+                const adminUserName = localStorage.getItem('admin_user_name');
+                
+                localStorage.setItem('user_id', adminUserId);
+                localStorage.setItem('session_token', adminSessionToken);
+                localStorage.setItem('user_name', adminUserName);
+                localStorage.removeItem('impersonating');
+                localStorage.removeItem('admin_user_id');
+                localStorage.removeItem('admin_session_token');
+                localStorage.removeItem('admin_user_name');
+                
+                window.location.href = '/admin';
+            }
+
+            // Load user calorie data
+            async function loadUserData() {
+                try {
+                    const response = await axios.get(\`/api/users/\${userId}\`);
+                    const user = response.data;
+                    
+                    // Calculate daily calorie goal (example: BMR * activity factor)
+                    const bmr = user.gender === 'male' 
+                        ? 10 * user.weight_kg + 6.25 * user.height_cm - 5 * user.age + 5
+                        : 10 * user.weight_kg + 6.25 * user.height_cm - 5 * user.age - 161;
+                    
+                    const activityFactor = 1.5; // Moderate activity
+                    const dailyGoal = Math.round(bmr * activityFactor);
+                    
+                    document.getElementById('dailyCalorieGoal').textContent = dailyGoal;
+                    
+                    // TODO: Load today's consumed calories from database
+                    // For now, placeholder
+                    const consumed = 0;
+                    document.getElementById('todayCalories').textContent = consumed;
+                    
+                    const balance = dailyGoal - consumed;
+                    const balanceEl = document.getElementById('calorieBalance');
+                    balanceEl.textContent = balance;
+                    balanceEl.classList.add(balance >= 0 ? 'text-green-600' : 'text-red-600');
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                }
+            }
+
+            function addMessage(content, isUser = false) {
+                const messagesDiv = document.getElementById('chatMessages');
+                
+                // Clear welcome message if exists
+                if (messagesDiv.querySelector('.text-center')) {
+                    messagesDiv.innerHTML = '';
+                }
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = \`mb-4 flex \${isUser ? 'justify-end' : 'justify-start'}\`;
+                
+                messageDiv.innerHTML = \`
+                    <div class="\${isUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} rounded-lg p-4 max-w-xl">
+                        <div class="flex items-start gap-2">
+                            <i class="fas \${isUser ? 'fa-user' : 'fa-robot'} mt-1"></i>
+                            <div class="whitespace-pre-wrap">\${content}</div>
+                        </div>
+                    </div>
+                \`;
+                
+                messagesDiv.appendChild(messageDiv);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+
+            async function sendMessage() {
+                const input = document.getElementById('chatInput');
+                const message = input.value.trim();
+                
+                if (!message) return;
+                
+                // Add user message
+                addMessage(message, true);
+                input.value = '';
+                
+                // Show loading
+                document.getElementById('loadingIndicator').classList.remove('hidden');
+                
+                try {
+                    // Call your GPT API here
+                    const response = await axios.post('/api/nutrition/chat', {
+                        message: message,
+                        userId: userId,
+                        history: conversationHistory
+                    });
+                    
+                    conversationHistory.push({ role: 'user', content: message });
+                    conversationHistory.push({ role: 'assistant', content: response.data.response });
+                    
+                    // Add GPT response
+                    addMessage(response.data.response, false);
+                } catch (error) {
+                    console.error('Error:', error);
+                    addMessage('מצטער, אירעה שגיאה. אנא נסה שוב.', false);
+                }
+                
+                // Hide loading
+                document.getElementById('loadingIndicator').classList.add('hidden');
+            }
+
+            function quickQuestion(question) {
+                document.getElementById('chatInput').value = question;
+                sendMessage();
+            }
+
+            // Load data on page load
+            loadUserData();
         </script>
     </body>
     </html>
