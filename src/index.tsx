@@ -5,6 +5,7 @@ import { calculateCalories, calculateCalorieSummary, calculateBMI, calculateWeig
 
 type Bindings = {
   DB: D1Database;
+  OPENAI_API_KEY: string;
 }
 
 const app = new Hono<{ Bindings: Bindings }>()

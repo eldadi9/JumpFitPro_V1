@@ -15,5 +15,9 @@
       "database_name": "rope-fitness-db",
       "database_id": "0d427123-5a11-45f5-a3bc-3ee9e3757556"
     }
-  ]
+  ],
+
+  "vars": {
+    "OPENAI_API_KEY": ""
+  }
 }
