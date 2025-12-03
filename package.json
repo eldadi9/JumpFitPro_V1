@@ -17,6 +17,8 @@
     "test": "curl http://localhost:3000"
   },
   "dependencies": {
+    "@cloudflare/workers-types": "^4.20251202.0",
+    "@supabase/supabase-js": "^2.86.0",
     "hono": "^4.10.6"
   },
   "devDependencies": {
