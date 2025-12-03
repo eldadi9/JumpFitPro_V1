@@ -8,13 +8,76 @@ type Bindings = {
   OPENAI_API_KEY: string;
 }
 
+// D1 Query Result Types
+interface UserRow {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  age?: number;
+  height_cm?: number;
+  weight_kg?: number;
+  target_weight_kg?: number;
+  gender?: string;
+  current_level?: string;
+  preferred_intensity?: string;
+  workouts_per_week?: number;
+  role?: string;
+  is_active?: number;
+  is_deleted?: number;
+  profile_image?: string;
+  created_at?: string;
+  last_login?: string;
+  updated_at?: string;
+  password_hash?: string;
+  oauth_provider?: string;
+  oauth_id?: string;
+  is_favorite?: number;
+}
+
+interface CountRow {
+  count: number;
+}
+
+interface SumRow {
+  total?: number;
+  avg?: number;
+}
+
+interface WorkoutStatsRow {
+  total_workouts?: number;
+  total_calories?: number;
+  total_work_minutes?: number;
+  last_workout_date?: string;
+}
+
+interface WeightRow {
+  weight_kg: number;
+  measurement_date?: string;
+  notes?: string;
+}
+
+interface WeightLossRow {
+  first_weight?: number;
+  current_weight?: number;
+}
+
+interface SessionRow {
+  user_id: number;
+  expires_at: string;
+}
+
+interface WorkoutRow {
+  user_id: number;
+}
+
 const app = new Hono<{ Bindings: Bindings }>()
 
 // Enable CORS
 app.use('/api/*', cors())
 
 // Serve static files
-app.use('/static/*', serveStatic({ root: './public' }))
+app.use('/static/*', serveStatic({ root: './public', manifest: {} }))
 
 // ========================================
 // API Routes - משתמשים
@@ -561,11 +624,11 @@ app.put('/api/workouts/:id', async (c) => {
       return c.json({ error: 'אימון לא נמצא' }, 404)
     }
 
-    const user = await c.env.DB.prepare(`SELECT weight_kg FROM users WHERE id = ?`).bind(workout.user_id).first()
+    const user = await c.env.DB.prepare(`SELECT weight_kg FROM users WHERE id = ?`).bind(workout.user_id).first() as UserRow | null
     
     // חישוב קלוריות מחדש
     const calorieResult = calculateCalories({
-      weight_kg: user.weight_kg as number,
+      weight_kg: (user?.weight_kg || 70) as number,
       work_minutes: parseFloat(work_minutes),
       intensity: intensity
     })
@@ -732,11 +795,11 @@ app.get('/api/workouts/user/:userId/stats', async (c) => {
     `).bind(userId).first()
 
     return c.json({
-      today_calories: todayCalories?.total || 0,
-      weekly_calories: weeklyCalories?.total || 0,
-      monthly_calories: monthlyCalories?.total || 0,
-      total_workouts: totalWorkouts?.count || 0,
-      avg_calories_per_workout: Math.round(avgCalories?.avg || 0)
+      today_calories: (todayCalories as SumRow | null)?.total || 0,
+      weekly_calories: (weeklyCalories as SumRow | null)?.total || 0,
+      monthly_calories: (monthlyCalories as SumRow | null)?.total || 0,
+      total_workouts: (totalWorkouts as CountRow | null)?.count || 0,
+      avg_calories_per_workout: Math.round((avgCalories as SumRow | null)?.avg || 0)
     })
   } catch (error) {
     return c.json({ error: 'שגיאה בקבלת סטטיסטיקות', details: String(error) }, 500)
@@ -827,10 +890,12 @@ app.get('/api/workouts/user/:userId/week-progress', async (c) => {
       SELECT workouts_per_week FROM users WHERE id = ?
     `).bind(userId).first()
     
+    const weekCount = (weekWorkouts as CountRow | null)?.count || 0
+    const userTarget = (user as UserRow | null)?.workouts_per_week || 3
     return c.json({
-      completed: weekWorkouts?.count || 0,
-      target: user?.workouts_per_week || 3,
-      remaining: Math.max(0, (user?.workouts_per_week || 3) - (weekWorkouts?.count || 0))
+      completed: weekCount,
+      target: userTarget,
+      remaining: Math.max(0, userTarget - weekCount)
     })
   } catch (error) {
     return c.json({ error: 'שגיאה בקבלת התקדמות שבועית', details: String(error) }, 500)
@@ -941,7 +1006,7 @@ app.post('/api/nutrition/chat', async (c) => {
       throw new Error(`OpenAI API error: ${response.statusText}`)
     }
 
-    const data = await response.json()
+    const data = await response.json() as { choices: Array<{ message?: { content?: string } }> }
     const gptResponse = data.choices[0]?.message?.content || 'לא הצלחתי לקבל תשובה'
 
     return c.json({ 
@@ -1343,7 +1408,7 @@ app.get('/api/admin/users/:id/details', async (c) => {
         MAX(created_at) as last_workout_date
       FROM workout_logs
       WHERE user_id = ?
-    `).bind(userId).first()
+    `).bind(userId).first() as WorkoutStatsRow | null
     
     // Get recent workouts (last 10)
     const recentWorkouts = await c.env.DB.prepare(`
@@ -1376,14 +1441,17 @@ app.get('/api/admin/users/:id/details', async (c) => {
     `).bind(userId).all()
     
     // Calculate BMI
-    const bmi = user.height_cm ? (user.weight_kg / Math.pow(user.height_cm / 100, 2)).toFixed(1) : null
+    const userWeight = Number(user.weight_kg) || 0
+    const userHeight = Number(user.height_cm) || 0
+    const userTargetWeight = Number(user.target_weight_kg) || userWeight
+    const bmi = userHeight ? (userWeight / Math.pow(userHeight / 100, 2)).toFixed(1) : null
     
     // Calculate progress
     const startWeight = weightHistory.results.length > 0 
-      ? weightHistory.results[weightHistory.results.length - 1].weight_kg 
-      : user.weight_kg
-    const currentWeight = user.weight_kg
-    const targetWeight = user.target_weight_kg
+      ? Number((weightHistory.results[weightHistory.results.length - 1] as unknown as WeightRow).weight_kg)
+      : userWeight
+    const currentWeight = userWeight
+    const targetWeight = userTargetWeight
     const totalToLose = startWeight - targetWeight
     const lost = startWeight - currentWeight
     const remaining = currentWeight - targetWeight
@@ -1394,14 +1462,14 @@ app.get('/api/admin/users/:id/details', async (c) => {
       user: {
         ...user,
         bmi: bmi,
-        bmi_status: bmi ? (bmi < 18.5 ? 'תת משקל' : bmi < 25 ? 'תקין' : bmi < 30 ? 'עודף משקל' : 'השמנה') : null
+        bmi_status: bmi ? (parseFloat(bmi) < 18.5 ? 'תת משקל' : parseFloat(bmi) < 25 ? 'תקין' : parseFloat(bmi) < 30 ? 'עודף משקל' : 'השמנה') : null
       },
       stats: {
         workouts: {
-          total: workoutStats.total_workouts || 0,
-          total_calories: workoutStats.total_calories || 0,
-          total_hours: workoutStats.total_work_minutes ? (workoutStats.total_work_minutes / 60).toFixed(1) : 0,
-          last_workout: workoutStats.last_workout_date || null
+          total: workoutStats?.total_workouts || 0,
+          total_calories: workoutStats?.total_calories || 0,
+          total_hours: workoutStats?.total_work_minutes ? (Number(workoutStats.total_work_minutes) / 60).toFixed(1) : 0,
+          last_workout: workoutStats?.last_workout_date || null
         },
         weight: {
           start_weight: startWeight,
@@ -1449,7 +1517,7 @@ app.get('/api/auth/me', async (c) => {
     }
     
     // Check if expired
-    if (new Date(session.expires_at) < new Date()) {
+    if (new Date(session.expires_at as string) < new Date()) {
       await c.env.DB.prepare(`
         DELETE FROM user_sessions WHERE session_token = ?
       `).bind(sessionToken).run()
@@ -1507,77 +1575,83 @@ app.post('/api/achievements/check/:userId', async (c) => {
     // Get user stats
     const workoutsCount = await c.env.DB.prepare(`
       SELECT COUNT(*) as count FROM workout_logs WHERE user_id = ?
-    `).bind(userId).first()
+    `).bind(userId).first() as CountRow | null
     
     const weekWorkouts = await c.env.DB.prepare(`
       SELECT COUNT(*) as count FROM workout_logs 
       WHERE user_id = ? 
       AND workout_date >= date('now', '-7 days')
-    `).bind(userId).first()
+    `).bind(userId).first() as CountRow | null
     
     const weightLoss = await c.env.DB.prepare(`
       SELECT 
         (SELECT weight_kg FROM weight_tracking WHERE user_id = ? ORDER BY measurement_date ASC LIMIT 1) as first_weight,
         (SELECT weight_kg FROM weight_tracking WHERE user_id = ? ORDER BY measurement_date DESC LIMIT 1) as current_weight
-    `).bind(userId, userId).first()
+    `).bind(userId, userId).first() as WeightLossRow | null
     
     // Check existing achievements
     const { results: existing } = await c.env.DB.prepare(`
       SELECT achievement_type FROM achievements WHERE user_id = ?
     `).bind(userId).all()
     
-    const existingTypes = new Set(existing.map(a => a.achievement_type))
+    const existingTypes = new Set((existing as Array<Record<string, unknown>>).map((a) => String(a.achievement_type)))
+    
+    // Helper variables for counts
+    const workoutsNum = workoutsCount?.count || 0
+    const weekWorkoutsNum = weekWorkouts?.count || 0
+    const firstWeightNum = Number(weightLoss?.first_weight) || 0
+    const currentWeightNum = Number(weightLoss?.current_weight) || 0
     
     // Check for new achievements
     const achievementChecks = [
       {
         type: 'first_workout',
-        condition: workoutsCount.count >= 1 && !existingTypes.has('first_workout'),
+        condition: workoutsNum >= 1 && !existingTypes.has('first_workout'),
         name: '🥇 אימון ראשון',
         value: 1
       },
       {
         type: 'workout_5',
-        condition: workoutsCount.count >= 5 && !existingTypes.has('workout_5'),
+        condition: workoutsNum >= 5 && !existingTypes.has('workout_5'),
         name: '🔥 5 אימונים',
         value: 5
       },
       {
         type: 'workout_10',
-        condition: workoutsCount.count >= 10 && !existingTypes.has('workout_10'),
+        condition: workoutsNum >= 10 && !existingTypes.has('workout_10'),
         name: '💪 10 אימונים',
         value: 10
       },
       {
         type: 'workout_25',
-        condition: workoutsCount.count >= 25 && !existingTypes.has('workout_25'),
+        condition: workoutsNum >= 25 && !existingTypes.has('workout_25'),
         name: '🎯 25 אימונים',
         value: 25
       },
       {
         type: 'workout_50',
-        condition: workoutsCount.count >= 50 && !existingTypes.has('workout_50'),
+        condition: workoutsNum >= 50 && !existingTypes.has('workout_50'),
         name: '🏆 50 אימונים',
         value: 50
       },
       {
         type: 'week_complete',
-        condition: weekWorkouts.count >= 3 && !existingTypes.has('week_complete'),
+        condition: weekWorkoutsNum >= 3 && !existingTypes.has('week_complete'),
         name: '⭐ שבוע מושלם',
         value: 3
       },
       {
         type: 'weight_loss_1kg',
-        condition: weightLoss && weightLoss.first_weight && weightLoss.current_weight && 
-                   (weightLoss.first_weight - weightLoss.current_weight >= 1) && 
+        condition: weightLoss && firstWeightNum > 0 && currentWeightNum > 0 && 
+                   (firstWeightNum - currentWeightNum >= 1) && 
                    !existingTypes.has('weight_loss_1kg'),
         name: '📉 ירידה של 1 ק"ג',
         value: 1
       },
       {
         type: 'weight_loss_5kg',
-        condition: weightLoss && weightLoss.first_weight && weightLoss.current_weight && 
-                   (weightLoss.first_weight - weightLoss.current_weight >= 5) && 
+        condition: weightLoss && firstWeightNum > 0 && currentWeightNum > 0 && 
+                   (firstWeightNum - currentWeightNum >= 5) && 
                    !existingTypes.has('weight_loss_5kg'),
         name: '🎉 ירידה של 5 ק"ג',
         value: 5
