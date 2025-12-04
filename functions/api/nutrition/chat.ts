@@ -53,6 +53,7 @@ m.post("/api/nutrition/chat", async (c) => {
     }
 
     const apiKey = c.env.OPENAI_API_KEY || "";
+	console.log("DEBUG OPENAI_API_KEY exists:", !!c.env.OPENAI_API_KEY);
     if (!apiKey) {
       const fallback =
         "⚠️ מערכת התזונה עדיין לא הוגדרה במלואה.\n\n" +
